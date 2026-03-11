@@ -5,6 +5,6 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.102"
-matrix-sdk = { version = "0.14.0", features = ["anyhow", "sqlite", "native-tls", "e2e-encryption", "automatic-room-key-forwarding"] }
+matrix-sdk = { version = "0.14.0", features = ["sqlite", "native-tls", "e2e-encryption", "automatic-room-key-forwarding"] }
 rpassword = "7.4.0"
 tokio = { version = "1.50.0", features = ["full"] }
