@@ -27,6 +27,7 @@ const KEYRING_DB_PASS: &str = "meteorite_db_password";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // create the storage folder (for sql stuff)
     let mut storage_path = dirs::home_dir()
         .ok_or_else(|| anyhow::anyhow!("Could not find home directory"))?;
 
@@ -38,6 +39,11 @@ async fn main() -> anyhow::Result<()> {
 
     let storage_str = storage_path.to_str().expect("Path invalid");
 
+    // we will probably make a function for logging in (the below code)
+    // but i have no idea how i should move all of this to a function
+    // (also, who is we? there is no we. its just me)
+
+    // this is for the db (i think sql but not sure, i wrote this code way too long ago)
     let charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     let db_entry = Entry::new(APP_NAME, KEYRING_DB_PASS)?;
     let db_pass = match db_entry.get_password() {
@@ -50,21 +56,27 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
+    // this is, in fact, not the real client this is just a "placeholder" because rust kept
+    // complaining
     let mut client = Client::builder().server_name_or_homeserver_url("matrix.org").build().await?;
 
     let session_entry = Entry::new(APP_NAME, KEYRING_SESSION)?;
 
+    // nobody change this, i almost got depressions here
     if let Ok(session_json) = session_entry.get_password() {
         // parse session and restore
         let session: MatrixSession = serde_json::from_str(&session_json)?;
         let user = &session.meta.user_id;
+        // define client
         client = Client::builder().server_name_or_homeserver_url(user.server_name()).sqlite_store(storage_str, Some(&db_pass)).build().await?;
+        // restore session with access token
         client.matrix_auth().restore_session(session, RoomLoadSettings::default()).await?;
-        dbg!("Session was in keyring");
+        dbg!("Session was in keyring"); // yay it worked
     } else {
         // session not in keyring, one time login
-        dbg!("no session found, please login");
+        dbg!("no session found, please login"); // hopefully only happens once
 
+        // input things are self explanatory
         println!("input user name");
 
         let mut user_inp = String::new();
@@ -80,8 +92,11 @@ async fn main() -> anyhow::Result<()> {
         println!("input password");
         let password_inp = read_password().unwrap();
 
+        // define client again
         client = Client::builder().server_name_or_homeserver_url(user.server_name()).sqlite_store(storage_str, Some(&db_pass)).build().await?;
 
+        // why did i make this span across multiple lines? nobody knows
+        // but anyways, this is login
         let response = client
             .matrix_auth()
             .login_username(&user, &password_inp)
@@ -99,6 +114,8 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
+    // function would end here
+
     // client.add_event_handler(|ev: SyncRoomMessageEvent| async move {
     //     println!("Received a message {:?}", ev);
     // });
@@ -107,6 +124,7 @@ async fn main() -> anyhow::Result<()> {
     // This method will never return unless there is an error.
     // client.sync(SyncSettings::default()).await?;
     
+    // this is test code for sending messages to rooms (dms dont work yet)
     println!("enter room id/alias");
 
     let mut room_inp = String::new();
@@ -117,6 +135,7 @@ async fn main() -> anyhow::Result<()> {
 
     room_inp = room_inp.trim().to_string();
 
+    // here the alias is "converted" to an id
     let room_alias_id = RoomOrAliasId::parse(room_inp).expect("Invalid input");
 
     let room_id = if room_alias_id.is_room_alias_id() {
@@ -132,12 +151,8 @@ async fn main() -> anyhow::Result<()> {
 
     // output all rooms (the client knows of), do no uncomment please
     // println!("{:?}", client.rooms());
-   /* 
-    let joined_rooms = client.joined_rooms();
-    println!("joined: {:?}", joined_rooms.iter().map(|r| r.room_id()).collect::<Vec<_>>());
-    */
     if let Some(room) = client.get_room(&room_id) {
-        if let RoomState::Joined = room.state() {
+        if let RoomState::Joined = room.state() { // only send if you are in the room
             // set the content to send
             println!("message to send");
             let mut message = String::new();
