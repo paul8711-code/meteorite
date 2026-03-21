@@ -9,7 +9,7 @@ use matrix_sdk::{
         MatrixSession
     },
     ruma::events::room::{
-    message::RoomMessageEventContent
+        message::RoomMessageEventContent
     },
     ruma::{UserId, RoomId, RoomOrAliasId, RoomAliasId, events::room::message::SyncRoomMessageEvent},
 };
@@ -58,6 +58,7 @@ async fn main() -> anyhow::Result<()> {
 
     // this is, in fact, not the real client this is just a "placeholder" because rust kept
     // complaining
+
     let mut client = Client::builder().server_name_or_homeserver_url("matrix.org").build().await?;
 
     let session_entry = Entry::new(APP_NAME, KEYRING_SESSION)?;
@@ -67,6 +68,7 @@ async fn main() -> anyhow::Result<()> {
         // parse session and restore
         let session: MatrixSession = serde_json::from_str(&session_json)?;
         let user = &session.meta.user_id;
+
         // define client
         client = Client::builder().server_name_or_homeserver_url(user.server_name()).sqlite_store(storage_str, Some(&db_pass)).build().await?;
         // restore session with access token
@@ -76,33 +78,67 @@ async fn main() -> anyhow::Result<()> {
         // session not in keyring, one time login
         dbg!("no session found, please login"); // hopefully only happens once
 
-        // input things are self explanatory
-        println!("input user name");
+        println!("(1) login with username");
+        println!("(2) login with sso");
 
-        let mut user_inp = String::new();
-
+        let mut choice = String::new();
         io::stdin()
-            .read_line(&mut user_inp)
+            .read_line(&mut choice)
             .expect("Failed to read line");
 
-        user_inp = user_inp.trim().to_string();
+        let choice_num: i32 = choice.trim().parse().expect("Not a valid number");
 
-        let user = UserId::parse(&user_inp)?;
+        println!("enter homeserver (without https://)");
+        let mut homeserver = String::new();
+        io::stdin()
+            .read_line(&mut homeserver)
+            .expect("Failed to read line");
 
-        println!("input password");
-        let password_inp = read_password().unwrap();
+        if choice_num == 1 {
+            // input things are self explanatory
+            println!("input user name (without homeserver)");
 
-        // define client again
-        client = Client::builder().server_name_or_homeserver_url(user.server_name()).sqlite_store(storage_str, Some(&db_pass)).build().await?;
+            let mut user_inp = String::new();
 
-        // why did i make this span across multiple lines? nobody knows
-        // but anyways, this is login
-        let response = client
-            .matrix_auth()
-            .login_username(&user, &password_inp)
+            io::stdin()
+                .read_line(&mut user_inp)
+                .expect("Failed to read line");
+
+            user_inp = user_inp.trim().to_string();
+
+            let user_final = format!("@{}:{}", user_inp, homeserver);
+
+            let user = UserId::parse(&user_final)?;
+
+            println!("input password");
+            let password_inp = read_password().unwrap();
+
+            // define client again
+            client = Client::builder().server_name_or_homeserver_url(user.server_name()).sqlite_store(storage_str, Some(&db_pass)).build().await?;
+
+            // why did i make this span across multiple lines? nobody knows
+            // but anyways, this is login
+            let response = client
+                .matrix_auth()
+                .login_username(&user, &password_inp)
+                .initial_device_display_name("meteorite Client")
+                .send()
+                .await?;
+        } else if choice_num == 2 {
+            let response = client
+                .matrix_auth()
+                .login_sso(|sso_url| async move {
+                    if webbrowser::open(&sso_url).is_ok() {
+                        println!("Go to the opened website to authenticate");
+                    }
+                    Ok(())
+                })
             .initial_device_display_name("meteorite Client")
-            .send()
-            .await?;
+                .await
+                .unwrap();
+        } else {
+            println!("invalid input");
+        }
 
         // put session in keyring
         if let Some(auth_session) = client.session() {
@@ -123,7 +159,7 @@ async fn main() -> anyhow::Result<()> {
     // Syncing is important to synchronize the client state with the server.
     // This method will never return unless there is an error.
     // client.sync(SyncSettings::default()).await?;
-    
+
     // this is test code for sending messages to rooms (dms dont work yet)
     println!("enter room id/alias");
 
@@ -153,7 +189,7 @@ async fn main() -> anyhow::Result<()> {
     // println!("{:?}", client.rooms());
     if let Some(room) = client.get_room(&room_id) {
         if let RoomState::Joined = room.state() { // only send if you are in the room
-            // set the content to send
+                                                  // set the content to send
             println!("message to send");
             let mut message = String::new();
             io::stdin()
