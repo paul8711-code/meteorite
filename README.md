@@ -2,7 +2,7 @@
 A Matrix client written in Rust
 
 ### Progress
-![](https://geps.dev/progress/30.77?barColor=3483eb)
+![](https://geps.dev/progress/23.08?barColor=3483eb)
 
 ### Todo
 - [x] Login (SSO & Username)
