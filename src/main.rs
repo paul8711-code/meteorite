@@ -1,9 +1,10 @@
 use matrix_sdk::{
     config::SyncSettings,
     RoomState,
+    Room,
     ruma::{
+        UserId,
         RoomId,
-        RoomOrAliasId,
         RoomAliasId,
         events::room::message::{
             RoomMessageEventContent,
@@ -56,21 +57,28 @@ async fn main() -> anyhow::Result<()> {
 
     room_inp = room_inp.trim().to_string();
 
-    // here the alias is "converted" to an id
-    let room_alias_id = RoomOrAliasId::parse(room_inp).expect("Invalid input");
-
-    let room_id = if room_alias_id.is_room_alias_id() {
-        let alias = RoomAliasId::parse(&room_alias_id).expect("if you see this, you broke something");
-        let response = client.resolve_room_alias(&alias).await?;
-        response.room_id
+    // here room id gets defined, checking if the inputted thing is a user, a room alias or a room
+    // id
+    let room_id: Option<Room> = if let Ok(user_id) = UserId::parse(&room_inp) {
+        // if the input is a dm (starting with "@")
+        client.get_dm_room(&user_id)
+    } else if let Ok(room_id) = RoomId::parse(&room_inp) {
+        // if the input is just a normal room id (starting with "!")
+        client.get_room(&room_id)
+    } else if let Ok(alias) = RoomAliasId::parse(&room_inp) {
+        if let Ok(response) = client.resolve_room_alias(&alias).await {
+            // if the input is an alias (starting with "#")
+            client.get_room(&response.room_id)
+        } else {
+            None
+        }
     } else {
-        let id = RoomId::parse(&room_alias_id).expect("what did you break this time...");
-        id.to_owned()
+        None
     };
 
     // output all rooms (the client knows of), do no uncomment please
     // println!("{:?}", client.rooms());
-    if let Some(room) = client.get_room(&room_id) {
+    if let Some(room) = room_id {
         if let RoomState::Joined = room.state() { // only send if you are in the room
                                                   // set the content to send
             println!("message to send");
