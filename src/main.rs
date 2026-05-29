@@ -1,18 +1,10 @@
 use matrix_sdk::{
+    Room, RoomState,
     config::SyncSettings,
-    RoomState,
-    Room,
-    ruma::{
-        UserId,
-        RoomId,
-        RoomAliasId,
-        events::room::message::{
-            RoomMessageEventContent,
-        },
-    },
+    ruma::{RoomAliasId, RoomId, UserId, events::room::message::RoomMessageEventContent},
 };
-use std::io;
 use std::fs;
+use std::io;
 
 mod auth;
 
@@ -22,9 +14,15 @@ const KEYRING_DB_PASS: &str = "meteorite_db_password";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
+    keyring_core::set_default_store(zbus_secret_service_keyring_store::Store::new()?);
+    #[cfg(target_os = "windows")]
+    keyring_core::set_default_store(windows_native_keyring_store::Store::new()?);
+    #[cfg(target_os = "macos")]
+    keyring_core::set_default_store(apple_native_keyring_store::Store::new()?);
     // create the storage folder (for sql stuff)
-    let mut storage_path = dirs::home_dir()
-        .ok_or_else(|| anyhow::anyhow!("Could not find home directory"))?;
+    let mut storage_path =
+        dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Could not find home directory"))?;
 
     storage_path.push(".meteorite");
 
@@ -79,19 +77,20 @@ async fn main() -> anyhow::Result<()> {
     // output all rooms (the client knows of), do no uncomment please
     // println!("{:?}", client.rooms());
     if let Some(room) = room_id {
-        if let RoomState::Joined = room.state() { // only send if you are in the room
-                                                  // set the content to send
+        if let RoomState::Joined = room.state() {
+            // only send if you are in the room
+            // set the content to send
             println!("message to send");
             let mut message = String::new();
             io::stdin()
                 .read_line(&mut message)
                 .expect("Failed to read line");
 
-            let content = RoomMessageEventContent::text_plain(&message.trim().to_string());
+            let content = RoomMessageEventContent::text_plain(message.trim().to_string());
 
             println!("sending");
             // (hopefully) send message
-            room.send(content).await.unwrap();
+            room.send(content).await?;
         } else {
             println!("You are not in this room");
         }
@@ -99,5 +98,6 @@ async fn main() -> anyhow::Result<()> {
         println!("maybe you arent in the room or the server is too slow rn");
     }
 
+    keyring_core::unset_default_store();
     Ok(())
 }

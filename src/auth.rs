@@ -1,19 +1,17 @@
+use keyring_core::Entry;
 use matrix_sdk::{
-    Client,
-    store::RoomLoadSettings,
-    authentication::matrix::{
-        MatrixSession
-    },
-    ruma::{
-        UserId,
-    },
+    Client, authentication::matrix::MatrixSession, ruma::UserId, store::RoomLoadSettings,
 };
-use keyring::Entry;
 use random_string::generate;
-use std::io;
 use rpassword::read_password;
+use std::io;
 
-pub async fn login(app_name: &str, keyring_db_pass: &str, keyring_session: &str, storage_str: &str) -> anyhow::Result<Client> {
+pub async fn login(
+    app_name: &str,
+    keyring_db_pass: &str,
+    keyring_session: &str,
+    storage_str: &str,
+) -> anyhow::Result<Client> {
     // this is for the db (i think sql but not sure, i wrote this code way too long ago)
     let charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     let db_entry = Entry::new(app_name, keyring_db_pass)?;
@@ -56,7 +54,10 @@ pub async fn login(app_name: &str, keyring_db_pass: &str, keyring_session: &str,
         // parse session and restore
         let session: MatrixSession = serde_json::from_str(&session_json)?;
         // restore session with access token
-        client.matrix_auth().restore_session(session, RoomLoadSettings::default()).await?;
+        client
+            .matrix_auth()
+            .restore_session(session, RoomLoadSettings::default())
+            .await?;
         dbg!("Session was in keyring"); // yay it worked
     } else {
         // session not in keyring, one time login
@@ -98,29 +99,29 @@ pub async fn login(app_name: &str, keyring_db_pass: &str, keyring_session: &str,
                 .initial_device_display_name("meteorite Client")
                 .send()
                 .await?;
-            } else if choice_num == 2 {
-                let _response = client
-                    .matrix_auth()
-                    .login_sso(|sso_url| async move {
-                        if webbrowser::open(&sso_url).is_ok() {
-                            println!("Go to the opened website to authenticate");
-                        }
-                        Ok(())
-                    })
+        } else if choice_num == 2 {
+            let _response = client
+                .matrix_auth()
+                .login_sso(|sso_url| async move {
+                    if webbrowser::open(&sso_url).is_ok() {
+                        println!("Go to the opened website to authenticate");
+                    }
+                    Ok(())
+                })
                 .initial_device_display_name("meteorite Client")
-                    .await
-                    .unwrap();
-                } else {
-                    println!("invalid input");
-                }
+                .await
+                .unwrap();
+        } else {
+            println!("invalid input");
+        }
 
         // put session in keyring
-        if let Some(auth_session) = client.session() {
-            if let matrix_sdk::AuthSession::Matrix(session) = auth_session {
-                let json = serde_json::to_string(&session)?;
-                session_entry.set_password(&json)?;
-                dbg!("success! login is now in keyring");
-            }
+        if let Some(auth_session) = client.session()
+            && let matrix_sdk::AuthSession::Matrix(session) = auth_session
+        {
+            let json = serde_json::to_string(&session)?;
+            session_entry.set_password(&json)?;
+            dbg!("success! login is now in keyring");
         }
     }
 
