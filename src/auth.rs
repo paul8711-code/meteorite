@@ -2,7 +2,7 @@ use keyring_core::Entry;
 use matrix_sdk::{
     Client, authentication::matrix::MatrixSession, ruma::UserId, store::RoomLoadSettings,
 };
-use random_string::generate;
+use rand::distr::{Alphanumeric, SampleString};
 use rpassword::read_password;
 use std::io;
 
@@ -13,13 +13,12 @@ pub async fn login(
     storage_str: &str,
 ) -> anyhow::Result<Client> {
     // this is for the db (i think sql but not sure, i wrote this code way too long ago)
-    let charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     let db_entry = Entry::new(app_name, keyring_db_pass)?;
     let db_pass = match db_entry.get_password() {
         Ok(p) => p,
         Err(e) => {
             dbg!("keyring error (db pass): {}", e);
-            let new_p = generate(32, charset); // generate random 32 digit password
+            let new_p = Alphanumeric.sample_string(&mut rand::rng(), 32); // generate random 32 digit password
             db_entry.set_password(&new_p)?;
             new_p.to_string()
         }
