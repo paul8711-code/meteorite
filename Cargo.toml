@@ -2,12 +2,20 @@
 name = "meteorite"
 version = "0.1.0"
 edition = "2024"
+authors = ["Paul8711 <support@paul8711.com>"]
+description = "Fast, Secure & Easy-to-use Matrix client in Rust"
+license = "AGPL-3.0-only"
+repository = "https://github.com/paul8711-code/meteorite"
 
 [dependencies]
 anyhow = "1.0.102"
 dirs = "6.0.0"
+eframe = "0.34.3"
+egui_extras = { version = "0.34.3", features = ["all_loaders"] }
+image = "0.25.10"
 keyring-core = "1.0.0"
-matrix-sdk = { version = "0.17.0", features = ["sqlite", "e2e-encryption", "automatic-room-key-forwarding", "qrcode", "sso-login"] }
+matrix-sdk = { version = "0.18.0", features = ["sqlite", "e2e-encryption", "automatic-room-key-forwarding", "qrcode", "sso-login"] }
+native-dialog = "0.9.7"
 random-string = "1.1.0"
 rpassword = "7.4.0"
 serde_json = "1.0.149"
