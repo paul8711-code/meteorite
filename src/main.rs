@@ -5,6 +5,7 @@ use matrix_sdk::{
 };
 use std::fs;
 use std::io;
+mod gui;
 
 mod auth;
 
@@ -14,6 +15,7 @@ const KEYRING_DB_PASS: &str = "meteorite_db_password";
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    gui::main();
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     keyring_core::set_default_store(zbus_secret_service_keyring_store::Store::new()?);
     #[cfg(target_os = "windows")]
