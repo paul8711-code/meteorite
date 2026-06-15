@@ -1,5 +1,5 @@
 # meteorite
-A Matrix client written in Rust
+Fast, Secure & Easy-to-use Matrix client in Rust
 
 ### Progress
 ![](https://geps.dev/progress/23.08?barColor=3483eb)
