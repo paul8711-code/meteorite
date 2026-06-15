@@ -1,6 +1,12 @@
 use eframe::egui;
 use native_dialog::{DialogBuilder, MessageLevel};
 
+#[derive(PartialEq, Clone, Copy)]
+enum LoginStage {
+    Homeserver,
+    Credentials,
+}
+
 pub fn main() {
     let native_options = eframe::NativeOptions::default();
     match eframe::run_native(
@@ -24,11 +30,12 @@ pub fn main() {
     }
 }
 
-#[derive(Default)]
 struct App {
     authenticated: bool,
+    show_validation_errors: bool,
     homeserver: String,
-    homeserver_set: bool, // treat this like a question (homeserver set?)
+    current_stage: LoginStage,
+    target_stage: LoginStage,
     username: String,
     password: String,
 }
@@ -41,10 +48,10 @@ impl App {
 
         let text_styles: BTreeMap<TextStyle, FontId> = [
             (TextStyle::Heading, FontId::new(25.0, Proportional)),
-            (TextStyle::Body, FontId::new(16.0, Proportional)),
-            (TextStyle::Monospace, FontId::new(12.0, Monospace)),
-            (TextStyle::Button, FontId::new(12.0, Proportional)),
-            (TextStyle::Small, FontId::new(8.0, Proportional)),
+            (TextStyle::Body, FontId::new(20.0, Proportional)),
+            (TextStyle::Monospace, FontId::new(20.0, Monospace)),
+            (TextStyle::Button, FontId::new(20.0, Proportional)),
+            (TextStyle::Small, FontId::new(15.0, Proportional)),
         ]
         .into();
         cc.egui_ctx
@@ -52,8 +59,10 @@ impl App {
         egui_extras::install_image_loaders(&cc.egui_ctx);
         Self {
             authenticated: false,
+            show_validation_errors: false,
             homeserver: String::new(),
-            homeserver_set: false,
+            current_stage: LoginStage::Homeserver,
+            target_stage: LoginStage::Homeserver,
             username: String::new(),
             password: String::new(),
         }
@@ -122,13 +131,28 @@ impl eframe::App for App {
                     });
                 });
 
-            let target_height = if !self.homeserver_set { 100.0 } else { 200.0 };
-            let animated_height = ui.ctx().animate_value_with_time(
+            let fading_out = self.current_stage != self.target_stage;
+
+            let opacity = ui.ctx().animate_bool_with_time(
+                ui.make_persistent_id("content_opacity"),
+                !fading_out,
+                0.15,
+            );
+
+            if fading_out && opacity < 0.01 {
+                self.current_stage = self.target_stage;
+            }
+
+            let target_height = match self.current_stage {
+                LoginStage::Homeserver => 120.0,
+                LoginStage::Credentials => 240.0,
+            };
+            let login_height_animation = ui.ctx().animate_value_with_time(
                 ui.make_persistent_id("login_height_animation"),
                 target_height,
                 0.1,
             );
-            let animation_finished = (animated_height - target_height).abs() < 1.0;
+            let animation_finished = (login_height_animation - target_height).abs() < 1.0;
 
             egui::Area::new("login_area".into())
                 .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
@@ -137,50 +161,101 @@ impl eframe::App for App {
                         .corner_radius(15.0)
                         .show(ui, |ui| {
                             ui.set_min_width(300.0);
-                            ui.set_min_height(animated_height);
+                            ui.set_height(login_height_animation);
 
-                            if !self.homeserver_set {
-                                ui.scope(|ui| {
-                                    ui.label("Homeserver");
-                                    ui.add(
-                                        egui::TextEdit::singleline(&mut self.homeserver)
-                                            .prefix("https://"),
-                                    );
+                            match self.current_stage {
+                                LoginStage::Homeserver => {
+                                    if animation_finished {
+                                        ui.scope(|ui| {
+                                            ui.set_opacity(opacity);
 
-                                    ui.add_space(10.0);
+                                            ui.horizontal(|ui| {
+                                                ui.add_space(10.0);
+                                                ui.label("Homeserver");
+                                            });
+                                            ui.vertical_centered(|ui| {
+                                                ui.add(
+                                                    egui::TextEdit::singleline(
+                                                        &mut self.homeserver,
+                                                    )
+                                                    .prefix("https://"),
+                                                );
+                                            });
+                                            ui.horizontal(|ui| {
+                                                if self.show_validation_errors {
+                                                    ui.add_space(10.0);
+                                                    ui.label(
+                                                        egui::RichText::new(
+                                                            "This field is required",
+                                                        )
+                                                        .color(egui::Color32::LIGHT_RED)
+                                                        .small(),
+                                                    );
+                                                }
+                                            });
 
-                                    if ui.button("Check").clicked() {
-                                        self.homeserver_set = true;
+                                            ui.add_space(10.0);
+
+                                            ui.with_layout(
+                                                egui::Layout::bottom_up(egui::Align::Center),
+                                                |ui| {
+                                                    if ui.button("Check").clicked() {
+                                                        if self.homeserver.is_empty() {
+                                                            self.show_validation_errors = true;
+                                                        } else {
+                                                            self.show_validation_errors = false;
+                                                            println!("{}", self.homeserver);
+                                                            self.target_stage =
+                                                                LoginStage::Credentials;
+                                                        }
+                                                    }
+                                                    ui.separator();
+                                                },
+                                            );
+                                        });
                                     }
-                                });
-                            } else {
-                                if animation_finished {
-                                    ui.scope(|ui| {
-                                        ui.label("Username");
-                                        ui.text_edit_singleline(&mut self.username);
+                                }
+                                LoginStage::Credentials => {
+                                    if animation_finished {
+                                        ui.scope(|ui| {
+                                            ui.set_opacity(opacity);
 
-                                        ui.label("Password");
-                                        ui.add(
-                                            egui::TextEdit::singleline(&mut self.password)
-                                                .password(true),
-                                        );
+                                            ui.horizontal(|ui| {
+                                                ui.add_space(10.0);
+                                                ui.label("Username");
+                                            });
+                                            ui.vertical_centered(|ui| {
+                                                ui.text_edit_singleline(&mut self.username);
+                                            });
 
-                                        ui.add_space(10.0);
+                                            ui.horizontal(|ui| {
+                                                ui.add_space(10.0);
+                                                ui.label("Password");
+                                            });
+                                            ui.vertical_centered(|ui| {
+                                                ui.add(
+                                                    egui::TextEdit::singleline(&mut self.password)
+                                                        .password(true),
+                                                );
+                                            });
 
-                                        if ui.button("Back").clicked() {
-                                            self.homeserver_set = false;
-                                        }
+                                            ui.add_space(10.0);
 
-                                        if ui.button("Login").clicked() {
-                                            println!("Login pressed");
-                                        }
+                                            if ui.button("Back").clicked() {
+                                                self.target_stage = LoginStage::Homeserver;
+                                            }
 
-                                        ui.label("or");
+                                            if ui.button("Login").clicked() {
+                                                self.authenticated = true;
+                                            }
 
-                                        if ui.button("Login with Homeserver").clicked() {
-                                            println!("Login with hs");
-                                        }
-                                    });
+                                            ui.label("or");
+
+                                            if ui.button("Login with Homeserver").clicked() {
+                                                println!("Login with hs");
+                                            }
+                                        });
+                                    }
                                 }
                             }
                         });
