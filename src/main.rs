@@ -1,41 +1,36 @@
-use matrix_sdk::{
-    Room, RoomState,
-    config::SyncSettings,
-    ruma::{RoomAliasId, RoomId, UserId, events::room::message::RoomMessageEventContent},
-};
-use std::fs;
-use std::io;
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+use std::sync::{Mutex, OnceLock};
+
+use crate::core::init;
+
+mod core;
 mod gui;
 
-mod auth;
+const APP_NAME: &str = "com.meteorite.paul8711";
+static BASE_PATH: OnceLock<Mutex<String>> = OnceLock::new();
+static ACCOUNT_PATH: OnceLock<Mutex<String>> = OnceLock::new();
+// const KEYRING_SESSION: &str = "meteorite_session_json";
+// const KEYRING_DB_PASS: &str = "meteorite_db_password";
 
-const APP_NAME: &str = "meteorite_client";
-const KEYRING_SESSION: &str = "meteorite_session_json";
-const KEYRING_DB_PASS: &str = "meteorite_db_password";
+struct KeyringGuard;
+
+impl Drop for KeyringGuard {
+    fn drop(&mut self) {
+        // this ensures that even if the program exits with an error, the keyring store is unset.
+        keyring_core::unset_default_store();
+    }
+}
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() {
+    // all errors are handled within the setup function
+    if init::setup().await.is_err() {
+        return;
+    };
+    let _keyring_guard = KeyringGuard;
     gui::main();
-    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
-    keyring_core::set_default_store(zbus_secret_service_keyring_store::Store::new()?);
-    #[cfg(target_os = "windows")]
-    keyring_core::set_default_store(windows_native_keyring_store::Store::new()?);
-    #[cfg(target_os = "macos")]
-    keyring_core::set_default_store(apple_native_keyring_store::Store::new()?);
-    // create the storage folder (for sql stuff)
-    let mut storage_path =
-        dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Could not find home directory"))?;
-
-    storage_path.push(".meteorite");
-
-    if !storage_path.exists() {
-        fs::create_dir_all(&storage_path)?;
-    }
-
-    let storage_str = storage_path.to_str().expect("Path invalid");
-
-    let client = auth::login(APP_NAME, KEYRING_DB_PASS, KEYRING_SESSION, storage_str).await?;
-
+    /*
     client.sync_once(SyncSettings::default()).await?;
 
     // client.add_event_handler(|ev: SyncRoomMessageEvent| async move {
@@ -99,7 +94,5 @@ async fn main() -> anyhow::Result<()> {
     } else {
         println!("maybe you arent in the room or the server is too slow rn");
     }
-
-    keyring_core::unset_default_store();
-    Ok(())
+    */
 }
