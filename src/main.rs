@@ -7,7 +7,7 @@ use crate::core::init;
 mod core;
 mod gui;
 
-const APP_NAME: &str = "com.meteorite.paul8711";
+const APP_NAME: &str = "com.paul8711.meteorite";
 static BASE_PATH: OnceLock<Mutex<String>> = OnceLock::new();
 static ACCOUNT_PATH: OnceLock<Mutex<String>> = OnceLock::new();
 // const KEYRING_SESSION: &str = "meteorite_session_json";
