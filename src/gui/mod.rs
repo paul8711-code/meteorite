@@ -95,7 +95,6 @@ impl App {
 }
 
 // TODO:
-// - make bg on loading screen & error screen
 // - possibly animate after loading screen
 
 impl eframe::App for App {

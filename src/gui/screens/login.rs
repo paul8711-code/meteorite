@@ -27,15 +27,15 @@ impl LoginScreen {
                     ui.ctx().viewport_rect(),
                     egui::Direction::TopDown,
                     [
-                        egui::Color32::from_rgb(0, 48, 32),
-                        egui::Color32::from_rgb(1, 51, 0),
+                        egui::Color32::from_rgb(30, 30, 30),
+                        egui::Color32::from_rgb(0, 0, 60),
                     ],
                 ));
             });
         });
 
         let target_height = match self.current_stage {
-            LoginStage::Homeserver => 135.0,
+            LoginStage::Homeserver => 200.0,
             LoginStage::Credentials => 325.0,
         };
         let (login_height_animation, render_opacity) = if self.current_stage != self.target_stage {
@@ -95,6 +95,9 @@ impl LoginScreen {
                         if login_height_animation == target_height && render_opacity > 0.0 {
                             match self.current_stage {
                                 LoginStage::Homeserver => {
+                                    ui.vertical_centered(|ui| {
+                                        widgets::add_icon(ui, egui::Vec2 { x: 64.0, y: 64.0 });
+                                    });
                                     ui.horizontal(|ui| {
                                         ui.add_space(10.0);
                                         ui.label("Homeserver");
