@@ -1,3 +1,4 @@
+use crate::APP_NAME;
 use crate::core::{auth, utils};
 use eframe::egui;
 use native_dialog::MessageLevel;
@@ -17,8 +18,22 @@ enum UiState {
     Main,
 }
 
+static ICON: &[u8] = include_bytes!("../../assets/icon/icon.png");
+
 pub fn main() {
-    let native_options = eframe::NativeOptions::default();
+    let native_options = eframe::NativeOptions {
+        viewport: egui::viewport::ViewportBuilder {
+            app_id: Some(APP_NAME.to_owned()),
+            icon: Some(Arc::new(
+                eframe::icon_data::from_png_bytes(include_bytes!(
+                    "../../assets/icon/icon-rounded.png"
+                ))
+                .unwrap(),
+            )),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
     match eframe::run_native(
         "meteorite",
         native_options,
@@ -89,8 +104,8 @@ impl App {
 // TODO:
 // - make sub functions (to fix massive indentation)
 // - move stuff to other files
-// - put app icon on loading screen & error screen
 // - make bg on loading screen & error screen
+// - possibly animate after loading screen
 
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
@@ -104,34 +119,47 @@ impl eframe::App for App {
 
         match current_state_value {
             UiState::Loading => {
-                let screen_rect = ui.max_rect();
-                let rect_size = egui::vec2(100.0, 100.0);
-                let screen_center = screen_rect.center();
-                let centered_rect = egui::Rect::from_center_size(screen_center, rect_size);
+                egui::CentralPanel::default()
+                    .frame(egui::Frame::new().fill(egui::Color32::from_rgb(36, 36, 36)))
+                    .show_inside(ui, |ui| {
+                        let screen_rect = ui.max_rect();
+                        let rect_size = egui::vec2(100.0, 100.0);
+                        let screen_center = screen_rect.center();
+                        let centered_rect = egui::Rect::from_center_size(screen_center, rect_size);
 
-                egui::widgets::Spinner::new().paint_at(ui, centered_rect);
-                if !self.login_started {
-                    self.login_started = true;
-                    let state_clone = std::sync::Arc::clone(&self.current_state);
-                    let ctx = ui.ctx().clone();
-                    tokio::spawn(async move {
-                        match auth::login().await {
-                            Ok(_client) => {
-                                if let Ok(mut state) = state_clone.lock() {
-                                    *state = UiState::Main;
-                                    // for instant repaint after
-                                    ctx.request_repaint();
+                        ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
+                            ui.add_space(50.0);
+                            ui.add(
+                                egui::Image::from_bytes("bytes://icon.png", ICON)
+                                    .corner_radius(15.0)
+                                    .fit_to_exact_size(egui::Vec2 { x: 256.0, y: 256.0 }),
+                            );
+                        });
+
+                        egui::widgets::Spinner::new().paint_at(ui, centered_rect);
+                        if !self.login_started {
+                            self.login_started = true;
+                            let state_clone = std::sync::Arc::clone(&self.current_state);
+                            let ctx = ui.ctx().clone();
+                            tokio::spawn(async move {
+                                match auth::login().await {
+                                    Ok(_client) => {
+                                        if let Ok(mut state) = state_clone.lock() {
+                                            *state = UiState::Main;
+                                            // for instant repaint after
+                                            ctx.request_repaint();
+                                        }
+                                    }
+                                    Err(e) => {
+                                        if let Ok(mut state) = state_clone.lock() {
+                                            *state = UiState::Error(e);
+                                            ctx.request_repaint();
+                                        }
+                                    }
                                 }
-                            }
-                            Err(e) => {
-                                if let Ok(mut state) = state_clone.lock() {
-                                    *state = UiState::Error(e);
-                                    ctx.request_repaint();
-                                }
-                            }
+                            });
                         }
                     });
-                }
             }
             UiState::Error(err) => match err {
                 auth::LoginError::NoAccountActive => {
@@ -140,20 +168,42 @@ impl eframe::App for App {
                     }
                 }
                 _ => {
-                    egui::Area::new("error_area".into())
-                        .anchor(egui::Align2::CENTER_TOP, [0.0, 50.0])
-                        .show(ui, |ui| {
-                            egui::Frame::window(&ui.global_style())
-                                .corner_radius(10.0)
-                                .fill(egui::Color32::from_hex("#FF7878").unwrap())
-                                .stroke(egui::Stroke::new(
-                                    3.0,
-                                    egui::Color32::from_hex("#FF0000").unwrap(),
-                                ))
+                    egui::CentralPanel::default()
+                        .frame(egui::Frame::new().fill(egui::Color32::from_rgb(36, 36, 36)))
+                        .show_inside(ui, |ui| {
+                            egui::Area::new("error_area".into())
+                                .anchor(egui::Align2::CENTER_TOP, [0.0, 50.0])
                                 .show(ui, |ui| {
-                                    ui.label(
-                                        egui::RichText::new(format!("{}", err))
-                                            .color(egui::Color32::from_hex("#000000").unwrap()),
+                                    ui.with_layout(
+                                        egui::Layout::top_down(egui::Align::Center),
+                                        |ui| {
+                                            egui::Frame::window(&ui.global_style())
+                                                .corner_radius(10.0)
+                                                .fill(egui::Color32::from_rgb(255, 120, 120))
+                                                .stroke(egui::Stroke::new(
+                                                    3.0,
+                                                    egui::Color32::from_rgb(255, 0, 0),
+                                                ))
+                                                .show(ui, |ui| {
+                                                    ui.label(
+                                                        egui::RichText::new(format!("{}", err))
+                                                            .color(egui::Color32::from_rgb(
+                                                                20, 20, 20,
+                                                            )),
+                                                    );
+                                                });
+
+                                            ui.add_space(50.0);
+
+                                            ui.add(
+                                                egui::Image::from_bytes("bytes://icon.png", ICON)
+                                                    .corner_radius(15.0)
+                                                    .fit_to_exact_size(egui::Vec2 {
+                                                        x: 256.0,
+                                                        y: 256.0,
+                                                    }),
+                                            );
+                                        },
                                     );
                                 });
                         });
@@ -206,15 +256,15 @@ impl eframe::App for App {
                     });
 
                 egui::CentralPanel::default()
-                    .frame(egui::Frame::NONE.fill(egui::Color32::from_hex("#202020").unwrap()))
+                    .frame(egui::Frame::NONE.fill(egui::Color32::from_rgb(32, 32, 32)))
                     .show_inside(ui, |ui| {
                         ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
                             ui.painter().add(egui::Shape::gradient_rect(
                                 ui.ctx().viewport_rect(),
                                 egui::Direction::TopDown,
                                 [
-                                    egui::Color32::from_hex("#003020").unwrap(),
-                                    egui::Color32::from_hex("#013300").unwrap(),
+                                    egui::Color32::from_rgb(0, 48, 32),
+                                    egui::Color32::from_rgb(1, 51, 0),
                                 ],
                             ));
                         });
