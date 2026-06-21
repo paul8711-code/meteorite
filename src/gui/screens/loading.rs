@@ -17,11 +17,7 @@ impl LoadingScreen {
 
                 ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
                     ui.add_space(50.0);
-                    ui.add(
-                        egui::Image::from_bytes("bytes://icon.png", ICON)
-                            .corner_radius(15.0)
-                            .fit_to_exact_size(egui::Vec2 { x: 256.0, y: 256.0 }),
-                    );
+                    widgets::add_icon(ui);
                 });
 
                 egui::widgets::Spinner::new().paint_at(ui, centered_rect);

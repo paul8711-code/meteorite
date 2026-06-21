@@ -95,7 +95,6 @@ impl App {
 }
 
 // TODO:
-// - make sub functions (to fix massive indentation)
 // - make bg on loading screen & error screen
 // - possibly animate after loading screen
 
