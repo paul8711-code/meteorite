@@ -1,5 +1,11 @@
-# meteorite
-Fast, Secure & Easy-to-use Matrix client in Rust
+<p align="center">
+  <img src="./assets/icon/icon-rounded.png" alt="meteorite" width="150">
+</p>
+
+<h1 align="center">meteorite</h1>
+<p align="center">
+  Fast, Secure & Easy-to-use Matrix client in Rust
+</p>
 
 ### Progress
 ![](https://geps.dev/progress/23.08?barColor=3483eb)
