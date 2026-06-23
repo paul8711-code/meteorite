@@ -89,13 +89,10 @@ impl App {
             login_screen: login::LoginScreen::default(),
             loading_screen: loading::LoadingScreen::default(),
             main_screen: main::MainScreen,
-            error_screen: error::ErrorScreen,
+            error_screen: error::ErrorScreen::default(),
         }
     }
 }
-
-// TODO:
-// - possibly animate after loading screen
 
 impl eframe::App for App {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
