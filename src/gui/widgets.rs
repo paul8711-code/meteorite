@@ -1,4 +1,4 @@
-use super::*;
+use super::{ICON, egui};
 
 // reusable components
 pub fn add_icon(ui: &mut egui::Ui, size: egui::Vec2) {

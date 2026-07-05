@@ -25,9 +25,9 @@ impl Drop for KeyringGuard {
 #[tokio::main]
 async fn main() {
     // all errors are handled within the setup function
-    if init::setup().await.is_err() {
+    if init::setup().is_err() {
         return;
-    };
+    }
     let _keyring_guard = KeyringGuard;
     gui::main();
     /*

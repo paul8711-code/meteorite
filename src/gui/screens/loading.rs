@@ -1,4 +1,4 @@
-use super::*;
+use super::{Arc, Mutex, UiState, auth, egui, widgets};
 
 #[derive(Default)]
 pub struct LoadingScreen {
@@ -38,7 +38,7 @@ impl LoadingScreen {
                             !*should_fade,
                             0.25,
                         );
-                    };
+                    }
 
                     ui.set_opacity(*opacity);
                 }

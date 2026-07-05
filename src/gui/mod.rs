@@ -45,14 +45,11 @@ pub fn main() {
         native_options,
         Box::new(|cc| Ok(Box::new(App::new(cc)))),
     ) {
-        Ok(_) => {}
+        Ok(()) => {}
         Err(e) => {
             utils::show_dialog_window(
                 "Launch Error",
-                format!(
-                    "The application failed to set up a graphics context.\n\nDetails: {}",
-                    e
-                ),
+                format!("The application failed to set up a graphics context.\n\nDetails: {e}"),
                 MessageLevel::Error,
             );
         }
@@ -106,7 +103,7 @@ impl eframe::App for App {
 
         match state {
             UiState::Loading => self.loading_screen.show(ui, &mut self.current_state),
-            UiState::Error(err) => self.error_screen.show(ui, &mut self.current_state, err),
+            UiState::Error(err) => self.error_screen.show(ui, &mut self.current_state, &err),
             UiState::Main => self.main_screen.show(ui),
             UiState::Login => self.login_screen.show(ui, &mut self.current_state),
         }

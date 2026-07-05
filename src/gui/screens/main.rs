@@ -1,10 +1,10 @@
-use super::*;
+use super::egui;
 
 #[derive(Default)]
 pub struct MainScreen;
 
 impl MainScreen {
-    pub fn show(&mut self, ui: &mut egui::Ui) {
+    pub fn show(&self, ui: &mut egui::Ui) {
         egui::Panel::left("room_list_panel")
             .resizable(false)
             .exact_size(75.0)

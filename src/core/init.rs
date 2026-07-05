@@ -10,30 +10,24 @@ use crate::core::utils;
 
 // this function calls all other init functions and handles errors, if any
 // interesting return type, i know but it lets main know that there was an error and drop _guard safely
-pub async fn setup() -> Result<(), ()> {
-    match setup_keyring().await {
-        Ok(_) => {}
+pub fn setup() -> Result<(), ()> {
+    match setup_keyring() {
+        Ok(()) => {}
         Err(e) => {
             utils::show_dialog_window(
                 "Keyring Error",
-                format!(
-                    "The application failed to set up the keyring store.\n\nDetails: {}",
-                    e
-                ),
+                format!("The application failed to set up the keyring store.\n\nDetails: {e}"),
                 MessageLevel::Error,
             );
             return Err(());
         }
     }
-    match setup_folders().await {
-        Ok(_) => {}
+    match setup_folders() {
+        Ok(()) => {}
         Err(e) => {
             utils::show_dialog_window(
                 "Folder Error",
-                format!(
-                    "The application failed to set up required folders.\n\nDetails: {}",
-                    e
-                ),
+                format!("The application failed to set up required folders.\n\nDetails: {e}"),
                 MessageLevel::Error,
             );
             return Err(());
@@ -43,7 +37,7 @@ pub async fn setup() -> Result<(), ()> {
 }
 
 // sets default keyring store depending on os you are on
-async fn setup_keyring() -> anyhow::Result<()> {
+fn setup_keyring() -> anyhow::Result<()> {
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     keyring_core::set_default_store(zbus_secret_service_keyring_store::Store::new()?);
     #[cfg(target_os = "windows")]
@@ -54,7 +48,7 @@ async fn setup_keyring() -> anyhow::Result<()> {
 }
 
 // sets some path variables and creates necessary folders
-async fn setup_folders() -> anyhow::Result<()> {
+fn setup_folders() -> anyhow::Result<()> {
     let base_path = dirs::data_local_dir()
         .ok_or(anyhow::anyhow!(
             "The application was unable to find the data path",
