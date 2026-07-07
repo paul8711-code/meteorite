@@ -13,6 +13,7 @@ use matrix_sdk::{
 use rand::distr::{Alphanumeric, SampleString};
 use serde::{Deserialize, Serialize};
 use std::fs;
+use tokio::sync::mpsc;
 
 // This file contains all functions for authenticating a user. That includes loading necessary
 // config files, getting passwords from keyring and using matrix sdks functions to send requests to
@@ -157,7 +158,10 @@ pub async fn login() -> Result<Client, LoginError> {
 }
 
 // authenticates a user via sso and saves the account config locally
-pub async fn login_sso(homeserver: &str) -> Result<Client, LoginError> {
+pub async fn login_sso(
+    homeserver: &str,
+    tx: mpsc::UnboundedSender<String>,
+) -> Result<Client, LoginError> {
     // initialize rng for later usage
     let (id, encryption_passphrase) = {
         let mut rng = rand::rng();
@@ -191,9 +195,11 @@ pub async fn login_sso(homeserver: &str) -> Result<Client, LoginError> {
         .login_sso(|sso_url| async move {
             // TODO: let ui know about the url
             if webbrowser::open(&sso_url).is_ok() {
-                println!("Go to the opened website to authenticate");
+                tx.send("Go to the opened website to authenticate".to_string())
+                    .ok();
             } else {
-                println!("Navigate to {sso_url} in a browser of choice");
+                tx.send(format!("Navigate to {sso_url} in a browser of choice"))
+                    .ok();
             }
             Ok(())
         })

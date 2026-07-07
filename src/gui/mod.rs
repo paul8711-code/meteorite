@@ -1,6 +1,7 @@
 use crate::APP_NAME;
 use crate::core::{auth, utils};
 use eframe::egui;
+use matrix_sdk::Client;
 use native_dialog::MessageLevel;
 use std::sync::{Arc, Mutex};
 
@@ -68,6 +69,7 @@ struct App {
     loading_screen: loading::LoadingScreen,
     main_screen: main::MainScreen,
     error_screen: error::ErrorScreen,
+    client: Option<Client>,
 }
 
 impl App {
@@ -93,6 +95,7 @@ impl App {
             loading_screen: loading::LoadingScreen::default(),
             main_screen: main::MainScreen,
             error_screen: error::ErrorScreen::default(),
+            client: None,
         }
     }
 }
@@ -114,7 +117,9 @@ impl eframe::App for App {
                     .show(ui, &mut self.current_state, (kind, message));
             }
             UiState::Main => self.main_screen.show(ui),
-            UiState::Login => self.login_screen.show(ui, &mut self.current_state),
+            UiState::Login => self
+                .login_screen
+                .show(ui, &mut self.current_state, &mut self.client),
         }
     }
 }
