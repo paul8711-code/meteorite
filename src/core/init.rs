@@ -1,7 +1,6 @@
 use crate::{ACCOUNT_PATH, APP_NAME, BASE_PATH};
 use native_dialog::MessageLevel;
 use std::fs;
-use std::path::PathBuf;
 use std::sync::Mutex;
 
 use crate::core::utils;
@@ -49,20 +48,15 @@ fn setup_keyring() -> anyhow::Result<()> {
 
 // sets some path variables and creates necessary folders
 fn setup_folders() -> anyhow::Result<()> {
-    let base_path = dirs::data_local_dir()
-        .ok_or(anyhow::anyhow!(
-            "The application was unable to find the data path",
-        ))?
-        .join(APP_NAME)
-        .into_os_string() // stupid overcomplicated conversion
-        .into_string()
-        .map_err(|_| anyhow::anyhow!("Path contains invalid UTF-8"))?;
+    let base_path = utils::local_data_dir(APP_NAME).ok_or(anyhow::anyhow!(
+        "The application was unable to find the data path",
+    ))?;
     // set() can only return an error when it has already been set, which in this case cannot
     // happen.
     BASE_PATH.set(Mutex::new(base_path)).unwrap();
 
     // shadow the upper variable because it is not required anymore
-    let base_path = PathBuf::from(utils::unwrap_lock(&BASE_PATH));
+    let base_path = utils::unwrap_lock(&BASE_PATH);
     // create dirs on first run
     if !base_path.exists() {
         fs::create_dir_all(&base_path)?;
@@ -70,16 +64,9 @@ fn setup_folders() -> anyhow::Result<()> {
 
     // account path is literally just base path with an extra folder
     let account_path = base_path.join("accounts");
-    ACCOUNT_PATH
-        .set(Mutex::new(
-            account_path
-                .into_os_string() // stupid conversion again
-                .into_string()
-                .map_err(|_| anyhow::anyhow!("Path contains invalid UTF-8"))?,
-        ))
-        .unwrap();
+    ACCOUNT_PATH.set(Mutex::new(account_path)).unwrap();
 
-    let account_path = PathBuf::from(utils::unwrap_lock(&ACCOUNT_PATH));
+    let account_path = utils::unwrap_lock(&ACCOUNT_PATH);
     // also create dirs
     if !account_path.exists() {
         fs::create_dir_all(&account_path)?;

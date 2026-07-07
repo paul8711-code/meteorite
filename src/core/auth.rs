@@ -14,7 +14,6 @@ use matrix_sdk::{
 use rand::distr::{Alphanumeric, SampleString};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
 
 // This file contains all functions for authenticating a user. That includes loading necessary
 // config files, getting passwords from keyring and using matrix sdks functions to send requests to
@@ -74,7 +73,6 @@ impl EncryptedAccountData {
 }
 
 // custom error type to let the ui know what to display
-// TODO: improve error handling
 #[derive(thiserror::Error, Debug)]
 pub enum LoginError {
     #[error("No account is active")]
@@ -87,7 +85,7 @@ pub enum LoginError {
 
 // logs in active account by restoring persisted matrix session
 pub async fn login() -> Result<Client, LoginError> {
-    let account_path = PathBuf::from(utils::unwrap_lock(&ACCOUNT_PATH));
+    let account_path = utils::unwrap_lock(&ACCOUNT_PATH);
     let users_path = account_path.join("users.toml");
 
     if !users_path.exists() {
@@ -172,7 +170,7 @@ pub async fn login_sso(homeserver: &str) -> Result<Client, LoginError> {
     };
 
     // define the paths once
-    let account_path = PathBuf::from(utils::unwrap_lock(&ACCOUNT_PATH));
+    let account_path = utils::unwrap_lock(&ACCOUNT_PATH);
 
     let users_path = account_path.join("users.toml");
     let encrypted_path = account_path.join(format!("{id}.enc"));

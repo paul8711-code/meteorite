@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 
 use crate::core::init;
@@ -8,8 +9,8 @@ mod core;
 mod gui;
 
 const APP_NAME: &str = "com.paul8711.meteorite";
-static BASE_PATH: OnceLock<Mutex<String>> = OnceLock::new();
-static ACCOUNT_PATH: OnceLock<Mutex<String>> = OnceLock::new();
+static BASE_PATH: OnceLock<Mutex<PathBuf>> = OnceLock::new();
+static ACCOUNT_PATH: OnceLock<Mutex<PathBuf>> = OnceLock::new();
 // const KEYRING_SESSION: &str = "meteorite_session_json";
 // const KEYRING_DB_PASS: &str = "meteorite_db_password";
 
