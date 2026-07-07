@@ -1,4 +1,4 @@
-use super::{Arc, Mutex, UiState, auth, egui, widgets};
+use super::{Arc, ErrorKind, Mutex, UiState, auth, egui, widgets};
 
 #[derive(Default)]
 pub struct LoadingScreen {
@@ -91,7 +91,20 @@ impl LoadingScreen {
                             if let Ok(mut state) = state_clone.lock()
                                 && *opacity <= 0.0
                             {
-                                *state = UiState::Error(e.clone());
+                                match e {
+                                    auth::LoginError::NoAccountActive => {
+                                        *state = UiState::Error {
+                                            kind: ErrorKind::NoAccountActive,
+                                            message: e.to_string(),
+                                        }
+                                    }
+                                    auth::LoginError::Other(_) => {
+                                        *state = UiState::Error {
+                                            kind: ErrorKind::Other,
+                                            message: e.to_string(),
+                                        }
+                                    }
+                                }
                                 ctx.request_repaint();
                                 break;
                             }

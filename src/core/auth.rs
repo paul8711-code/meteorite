@@ -1,5 +1,6 @@
 use crate::{ACCOUNT_PATH, APP_NAME, core::utils};
 use age::secrecy::SecretString;
+use anyhow::anyhow;
 use keyring_core::Entry;
 use matrix_sdk::{
     Client, SessionMeta, SessionTokens,
@@ -73,18 +74,13 @@ impl EncryptedAccountData {
 }
 
 // custom error type to let the ui know what to display
-#[derive(thiserror::Error, Debug, PartialEq, Clone)]
+// TODO: improve error handling
+#[derive(thiserror::Error, Debug)]
 pub enum LoginError {
     #[error("No account is active")]
     NoAccountActive,
-    #[error("IO Error: {0}")]
-    IoError(String),
-    #[error("Keyring Error: {0}")]
-    KeyringError(String),
-    #[error("Encryption Error: {0}")]
-    EncryptionError(String),
-    #[error("Matrix Error: {0}")]
-    MatrixError(String),
+    #[error(transparent)]
+    Other(#[from] anyhow::Error),
 }
 
 // TODO: split functions into helpers
@@ -98,10 +94,8 @@ pub async fn login() -> Result<Client, LoginError> {
         return Err(LoginError::NoAccountActive);
     }
     // first read unencrypted file with all users
-    let toml_account_data =
-        fs::read_to_string(users_path).map_err(|e| LoginError::IoError(e.to_string()))?;
-    let accounts: AccountList = toml::from_str(&toml_account_data)
-        .map_err(|e| LoginError::IoError(e.message().to_string()))?;
+    let toml_account_data = fs::read_to_string(users_path).map_err(|e| anyhow!(e))?;
+    let accounts: AccountList = toml::from_str(&toml_account_data).map_err(|e| anyhow!(e))?;
 
     // filter the accounts for only active accounts
     let mut active_accounts = accounts.accounts.iter().filter(|a| a.active);
@@ -117,25 +111,24 @@ pub async fn login() -> Result<Client, LoginError> {
     let sqlite_path = account_path.join(&account_data.id);
 
     // retrieve encryption passphrase from keyring (used for file encryption and db encryption)
-    let encryption_passphrase_entry = Entry::new(APP_NAME, &account_data.id)
-        .map_err(|e| LoginError::KeyringError(e.to_string()))?;
+    let encryption_passphrase_entry =
+        Entry::new(APP_NAME, &account_data.id).map_err(|e| anyhow!(e))?;
     let encryption_passphrase = encryption_passphrase_entry
         .get_password()
-        .map_err(|e| LoginError::KeyringError(e.to_string()))?;
+        .map_err(|e| anyhow!(e))?;
 
     // load encrypted file contents
-    let data = fs::read(&encrypted_path).map_err(|e| LoginError::IoError(e.to_string()))?;
+    let data = fs::read(&encrypted_path).map_err(|e| anyhow!(e))?;
 
     // get identity from passphrase
     let identity = age::scrypt::Identity::new(SecretString::from(encryption_passphrase.as_str()));
 
     // actually decrypt the file contents
-    let decrypted_bytes =
-        age::decrypt(&identity, &data).map_err(|e| LoginError::EncryptionError(e.to_string()))?;
+    let decrypted_bytes = age::decrypt(&identity, &data).map_err(|e| anyhow!(e))?;
 
     // deserialize decrypted toml into stored account data
     let decrypted_account_data: EncryptedAccountData =
-        toml::from_slice(&decrypted_bytes).map_err(|e| LoginError::IoError(e.to_string()))?;
+        toml::from_slice(&decrypted_bytes).map_err(|e| anyhow!(e))?;
 
     // construct the client
     let client = Client::builder()
@@ -146,7 +139,7 @@ pub async fn login() -> Result<Client, LoginError> {
         )
         .build()
         .await
-        .map_err(|e| LoginError::MatrixError(e.to_string()))?;
+        .map_err(|e| anyhow!(e))?;
 
     // TODO: check if access token expired
     // if yes:
@@ -161,7 +154,8 @@ pub async fn login() -> Result<Client, LoginError> {
             RoomLoadSettings::default(),
         )
         .await
-        .map_err(|e| LoginError::MatrixError(e.to_string()))?;
+        .map_err(|e| anyhow!(e))?;
+
     Ok(client)
 }
 
@@ -184,7 +178,7 @@ pub async fn login_sso(homeserver: &str) -> Result<Client, LoginError> {
     let encrypted_path = account_path.join(format!("{id}.enc"));
     let sqlite_path = account_path.join(&id);
 
-    fs::create_dir_all(&account_path).map_err(|e| LoginError::IoError(e.to_string()))?;
+    fs::create_dir_all(&account_path).map_err(|e| anyhow!(e))?;
 
     // construct the client
     let client = Client::builder()
@@ -192,7 +186,7 @@ pub async fn login_sso(homeserver: &str) -> Result<Client, LoginError> {
         .sqlite_store(&sqlite_path, Some(&encryption_passphrase))
         .build()
         .await
-        .map_err(|e| LoginError::MatrixError(e.to_string()))?;
+        .map_err(|e| anyhow!(e))?;
 
     // start sso login
     let response = client
@@ -208,7 +202,7 @@ pub async fn login_sso(homeserver: &str) -> Result<Client, LoginError> {
         })
         .initial_device_display_name("meteorite Client")
         .await
-        .map_err(|e| LoginError::MatrixError(e.to_string()))?;
+        .map_err(|e| anyhow!(e))?;
 
     // construct new encrypted account data from response
     let account_data = EncryptedAccountData::new(
@@ -219,25 +213,22 @@ pub async fn login_sso(homeserver: &str) -> Result<Client, LoginError> {
     );
 
     // account_data struct -> toml
-    let serialized =
-        toml::to_string(&account_data).map_err(|e| LoginError::IoError(e.to_string()))?;
+    let serialized = toml::to_string(&account_data).map_err(|e| anyhow!(e))?;
 
     // get recipient from passphrase
     let recipient = age::scrypt::Recipient::new(SecretString::from(encryption_passphrase.as_str()));
 
     // encrypt account data
-    let encrypted_bytes = age::encrypt(&recipient, serialized.as_bytes())
-        .map_err(|e| LoginError::EncryptionError(e.to_string()))?;
+    let encrypted_bytes =
+        age::encrypt(&recipient, serialized.as_bytes()).map_err(|e| anyhow!(e))?;
 
-    let encryption_passphrase_entry =
-        Entry::new(APP_NAME, &id).map_err(|e| LoginError::KeyringError(e.to_string()))?;
+    let encryption_passphrase_entry = Entry::new(APP_NAME, &id).map_err(|e| anyhow!(e))?;
 
     // read unencrypted file with all users
     let mut accounts: AccountList = if users_path.exists() {
-        let toml_account_data =
-            fs::read_to_string(&users_path).map_err(|e| LoginError::IoError(e.to_string()))?;
-        let mut accounts: AccountList = toml::from_str(&toml_account_data)
-            .map_err(|e| LoginError::IoError(e.message().to_string()))?;
+        let toml_account_data = fs::read_to_string(&users_path).map_err(|e| anyhow!(e))?;
+        let mut accounts: AccountList =
+            toml::from_str(&toml_account_data).map_err(|e| anyhow!(e))?;
 
         // set all accounts active to false (for the new account to be active)
         accounts.accounts.iter_mut().for_each(|a| a.active = false);
@@ -253,21 +244,20 @@ pub async fn login_sso(homeserver: &str) -> Result<Client, LoginError> {
         active: true,
     });
 
-    let toml_account_data =
-        toml::to_string(&accounts).map_err(|e| LoginError::IoError(e.to_string()))?;
+    let toml_account_data = toml::to_string(&accounts).map_err(|e| anyhow!(e))?;
 
     // TODO: handle orphaned accounts
 
     // save encryption passphrase to keyring (used for file encryption and db encryption)
     encryption_passphrase_entry
         .set_password(&encryption_passphrase)
-        .map_err(|e| LoginError::KeyringError(e.to_string()))?;
+        .map_err(|e| anyhow!(e))?;
 
     // write bytes to encrypted file
-    fs::write(&encrypted_path, &encrypted_bytes).map_err(|e| LoginError::IoError(e.to_string()))?;
+    fs::write(&encrypted_path, &encrypted_bytes).map_err(|e| anyhow!(e))?;
 
     // write unecnrypted file
-    fs::write(&users_path, toml_account_data).map_err(|e| LoginError::IoError(e.to_string()))?;
+    fs::write(&users_path, toml_account_data).map_err(|e| anyhow!(e))?;
 
     Ok(client)
 }

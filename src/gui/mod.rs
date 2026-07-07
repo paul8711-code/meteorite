@@ -19,9 +19,15 @@ enum LoginStage {
 #[derive(PartialEq, Clone)]
 enum UiState {
     Loading,
-    Error(auth::LoginError),
+    Error { kind: ErrorKind, message: String },
     Login,
     Main,
+}
+
+#[derive(PartialEq, Clone)]
+enum ErrorKind {
+    NoAccountActive,
+    Other,
 }
 
 static ICON: &[u8] = include_bytes!("../../assets/icon/icon.png");
@@ -103,7 +109,10 @@ impl eframe::App for App {
 
         match state {
             UiState::Loading => self.loading_screen.show(ui, &mut self.current_state),
-            UiState::Error(err) => self.error_screen.show(ui, &mut self.current_state, &err),
+            UiState::Error { kind, message } => {
+                self.error_screen
+                    .show(ui, &mut self.current_state, (kind, message));
+            }
             UiState::Main => self.main_screen.show(ui),
             UiState::Login => self.login_screen.show(ui, &mut self.current_state),
         }

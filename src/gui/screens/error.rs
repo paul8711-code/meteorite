@@ -1,4 +1,4 @@
-use super::{Arc, Mutex, UiState, auth, egui, widgets};
+use super::{Arc, ErrorKind, Mutex, UiState, egui, widgets};
 
 #[derive(Default)]
 pub struct ErrorScreen {
@@ -10,20 +10,20 @@ impl ErrorScreen {
         &mut self,
         ui: &mut egui::Ui,
         state: &mut Arc<Mutex<UiState>>,
-        err: &auth::LoginError,
+        err: (ErrorKind, String),
     ) {
         match err {
-            auth::LoginError::NoAccountActive => {
+            (ErrorKind::NoAccountActive, _) => {
                 if let Ok(mut state) = state.lock() {
                     *state = UiState::Login;
                 }
             }
-            _ => self.display_error(ui, err),
+            (ErrorKind::Other, message) => self.display_error(ui, &message),
         }
         self.should_fade = true;
     }
 
-    fn display_error(&self, ui: &mut egui::Ui, err: &auth::LoginError) {
+    fn display_error(&self, ui: &mut egui::Ui, err: &str) {
         egui::Panel::bottom("login_bottom_panel")
             .resizable(false)
             .exact_size(50.0)
@@ -63,7 +63,7 @@ impl ErrorScreen {
                             .stroke(egui::Stroke::new(3.0, egui::Color32::from_rgb(255, 0, 0)))
                             .show(ui, |ui| {
                                 ui.label(
-                                    egui::RichText::new(format!("{err}"))
+                                    egui::RichText::new(err)
                                         .color(egui::Color32::from_rgb(20, 20, 20)),
                                 );
                             });
