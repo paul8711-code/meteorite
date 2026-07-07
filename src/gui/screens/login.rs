@@ -16,13 +16,13 @@ impl LoginScreen {
         egui::Panel::bottom("login_bottom_panel")
             .resizable(false)
             .exact_size(50.0)
-            .show_inside(ui, |ui| {
+            .show(ui, |ui| {
                 ui.horizontal(|ui| {
                     ui.label(env!("CARGO_PKG_VERSION"));
                 });
             });
 
-        egui::CentralPanel::default().show_inside(ui, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
             ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
                 ui.painter().add(egui::Shape::gradient_rect(
                     ui.ctx().viewport_rect(),

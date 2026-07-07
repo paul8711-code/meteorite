@@ -8,7 +8,7 @@ impl MainScreen {
         egui::Panel::left("room_list_panel")
             .resizable(false)
             .exact_size(75.0)
-            .show_inside(ui, |ui| {
+            .show(ui, |ui| {
                 ui.add_space(5.0);
                 // all icons have now been normed to 50 px
                 let home_button = ui.add(
@@ -27,12 +27,12 @@ impl MainScreen {
         egui::Panel::right("account_panel")
             .resizable(false)
             .exact_size(350.0)
-            .show_inside(ui, |ui| {
+            .show(ui, |ui| {
                 if ui.button("settings").clicked() {
                     println!("settings");
                 }
             });
-        egui::CentralPanel::default().show_inside(ui, |ui| {
+        egui::CentralPanel::default().show(ui, |ui| {
             ui.heading("meteorite");
 
             if ui.button("test").clicked() {
