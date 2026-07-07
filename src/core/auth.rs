@@ -4,13 +4,15 @@ use keyring_core::Entry;
 use matrix_sdk::{
     Client, SessionMeta, SessionTokens,
     authentication::matrix::MatrixSession,
-    ruma::{OwnedDeviceId, OwnedUserId},
+    ruma::{
+        OwnedDeviceId, OwnedUserId,
+        time::{Duration, SystemTime},
+    },
     store::RoomLoadSettings,
 };
 use rand::distr::{Alphanumeric, SampleString};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::io::Read;
 use std::path::PathBuf;
 
 // This file contains all functions for authenticating a user. That includes loading necessary
@@ -21,31 +23,8 @@ use std::path::PathBuf;
 // store sessions in encrypted files (using age crate) and store passphrase to tht in keyring
 // user_ids are stored in unencrypted with information if its active or not
 
-// stores both the encrypted data and the unencrypted data
-pub struct Account {
-    data: AccountData,
-    encrypted_data: EncryptedAccountData,
-}
-
-// since almost all values in the account struct are the same as in matrix session struct this is
-// pretty simple
-impl From<&Account> for MatrixSession {
-    fn from(account: &Account) -> Self {
-        Self {
-            meta: SessionMeta {
-                user_id: account.data.user_id.clone(),
-                device_id: account.encrypted_data.device_id.clone(),
-            },
-            tokens: SessionTokens {
-                access_token: account.encrypted_data.access_token.clone(),
-                refresh_token: account.encrypted_data.refresh_token.clone(),
-            },
-        }
-    }
-}
-
 // this struct only exists for toml
-#[derive(Deserialize, Serialize, Clone)]
+#[derive(Default, Deserialize, Serialize, Clone)]
 struct AccountList {
     accounts: Vec<AccountData>,
 }
@@ -53,6 +32,8 @@ struct AccountList {
 // stored in unencrypted file, lets the client decide which data to load
 #[derive(Deserialize, Serialize, Clone)]
 struct AccountData {
+    // id used for files instead of user_id
+    id: String,
     user_id: OwnedUserId,
     active: bool,
 }
@@ -63,7 +44,32 @@ struct AccountData {
 struct EncryptedAccountData {
     access_token: String,
     refresh_token: Option<String>,
+    expiration: Option<SystemTime>,
     device_id: OwnedDeviceId,
+}
+
+impl EncryptedAccountData {
+    fn new(
+        access_token: String,
+        refresh_token: Option<String>,
+        expires_in: Option<Duration>,
+        device_id: OwnedDeviceId,
+    ) -> Self {
+        let expiration = if let Some(expires_in) = expires_in {
+            // TODO: in worst case scenario it can happen that checked_add returns None
+            // -> incorrectly sets expiration to none
+            SystemTime::now().checked_add(expires_in)
+        } else {
+            None
+        };
+
+        Self {
+            access_token,
+            refresh_token,
+            expiration,
+            device_id,
+        }
+    }
 }
 
 // custom error type to let the ui know what to display
@@ -81,14 +87,17 @@ pub enum LoginError {
     MatrixError(String),
 }
 
-// the login function tries to login the active user (if config exists), if it fails error is returned (so
-// the gui can handle logging in itself)
+// TODO: split functions into helpers
+
+// logs in active account by restoring persisted matrix session
 pub async fn login() -> Result<Client, LoginError> {
-    // first read unencrypted file with all users
-    let users_path = PathBuf::from(utils::unwrap_lock(&ACCOUNT_PATH)).join("users.toml");
+    let account_path = PathBuf::from(utils::unwrap_lock(&ACCOUNT_PATH));
+    let users_path = account_path.join("users.toml");
+
     if !users_path.exists() {
         return Err(LoginError::NoAccountActive);
     }
+    // first read unencrypted file with all users
     let toml_account_data =
         fs::read_to_string(users_path).map_err(|e| LoginError::IoError(e.to_string()))?;
     let accounts: AccountList = toml::from_str(&toml_account_data)
@@ -103,61 +112,76 @@ pub async fn login() -> Result<Client, LoginError> {
     }
     .ok_or(LoginError::NoAccountActive)?;
 
+    // define the paths once
+    let encrypted_path = account_path.join(format!("{}.enc", account_data.id));
+    let sqlite_path = account_path.join(&account_data.id);
+
     // retrieve encryption passphrase from keyring (used for file encryption and db encryption)
-    let encryption_passphrase = Entry::new(APP_NAME, account_data.user_id.as_ref())
+    let encryption_passphrase_entry = Entry::new(APP_NAME, &account_data.id)
         .map_err(|e| LoginError::KeyringError(e.to_string()))?;
-    let encryption_passphrase = encryption_passphrase
+    let encryption_passphrase = encryption_passphrase_entry
         .get_password()
         .map_err(|e| LoginError::KeyringError(e.to_string()))?;
 
     // load encrypted file contents
-    let mut f = fs::File::open(
-        PathBuf::from(utils::unwrap_lock(&ACCOUNT_PATH)).join(format!(
-            "{}.enc",
-            account_data.user_id.as_str().replace(['@', ':'], "")
-        )),
-    )
-    .map_err(|e| LoginError::IoError(e.to_string()))?;
-    let mut data = vec![];
-    f.read_to_end(&mut data)
-        .map_err(|e| LoginError::IoError(e.to_string()))?;
+    let data = fs::read(&encrypted_path).map_err(|e| LoginError::IoError(e.to_string()))?;
 
     // get identity from passphrase
-    let identity = age::scrypt::Identity::new(SecretString::from(encryption_passphrase.clone()));
+    let identity = age::scrypt::Identity::new(SecretString::from(encryption_passphrase.as_str()));
 
     // actually decrypt the file contents
     let decrypted_bytes =
         age::decrypt(&identity, &data).map_err(|e| LoginError::EncryptionError(e.to_string()))?;
 
-    // saved in toml, using toml crates from_slice function to read into struct directly from bytes
-    let encrypted_data: EncryptedAccountData =
+    // deserialize decrypted toml into stored account data
+    let decrypted_account_data: EncryptedAccountData =
         toml::from_slice(&decrypted_bytes).map_err(|e| LoginError::IoError(e.to_string()))?;
 
     // construct the client
     let client = Client::builder()
         .server_name_or_homeserver_url(account_data.user_id.server_name())
         .sqlite_store(
-            PathBuf::from(utils::unwrap_lock(&ACCOUNT_PATH))
-                .join(account_data.user_id.as_str().replace(['@', ':'], "")),
+            sqlite_path,
             Some(&encryption_passphrase), // same as for encrypted files
         )
         .build()
         .await
         .map_err(|e| LoginError::MatrixError(e.to_string()))?;
 
-    // merge account data and encrypted account data in our unified struct
-    let account = Account {
-        data: account_data.clone(),
-        encrypted_data,
-    };
+    // TODO: check if access token expired
+    // if yes:
+    // -> refresh using refresh token
+    // -> save new token and expiration date
 
     // restore session from the unified account struct
     client
         .matrix_auth()
-        .restore_session(MatrixSession::from(&account), RoomLoadSettings::default())
+        .restore_session(
+            matrix_session_from_account(account_data, &decrypted_account_data),
+            RoomLoadSettings::default(),
+        )
         .await
         .map_err(|e| LoginError::MatrixError(e.to_string()))?;
     Ok(client)
+}
+        .await
+        .map_err(|e| LoginError::MatrixError(e.to_string()))?;
+    Ok(client)
+}
+fn matrix_session_from_account(
+    data: &AccountData,
+    encrypted: &EncryptedAccountData,
+) -> MatrixSession {
+    MatrixSession {
+        meta: SessionMeta {
+            user_id: data.user_id.clone(),
+            device_id: encrypted.device_id.clone(),
+        },
+        tokens: SessionTokens {
+            access_token: encrypted.access_token.clone(),
+            refresh_token: encrypted.refresh_token.clone(),
+        },
+    }
 }
 /*
 pub async fn login(
