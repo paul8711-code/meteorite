@@ -164,10 +164,114 @@ pub async fn login() -> Result<Client, LoginError> {
         .map_err(|e| LoginError::MatrixError(e.to_string()))?;
     Ok(client)
 }
+
+// authenticates a user via sso and saves the account config locally
+pub async fn login_sso(homeserver: &str) -> Result<Client, LoginError> {
+    // initialize rng for later usage
+    let (id, encryption_passphrase) = {
+        let mut rng = rand::rng();
+        // generate id for usage on sqlite store and other files
+        let id = Alphanumeric.sample_string(&mut rng, 32);
+        // generate passphrase for sqlite store and encrypted files
+        let encryption_passphrase = Alphanumeric.sample_string(&mut rng, 32);
+        (id, encryption_passphrase)
+    };
+
+    // define the paths once
+    let account_path = PathBuf::from(utils::unwrap_lock(&ACCOUNT_PATH));
+
+    let users_path = account_path.join("users.toml");
+    let encrypted_path = account_path.join(format!("{id}.enc"));
+    let sqlite_path = account_path.join(&id);
+
+    fs::create_dir_all(&account_path).map_err(|e| LoginError::IoError(e.to_string()))?;
+
+    // construct the client
+    let client = Client::builder()
+        .server_name_or_homeserver_url(homeserver)
+        .sqlite_store(&sqlite_path, Some(&encryption_passphrase))
+        .build()
         .await
         .map_err(|e| LoginError::MatrixError(e.to_string()))?;
+
+    // start sso login
+    let response = client
+        .matrix_auth()
+        .login_sso(|sso_url| async move {
+            // TODO: let ui know about the url
+            if webbrowser::open(&sso_url).is_ok() {
+                println!("Go to the opened website to authenticate");
+            } else {
+                println!("Navigate to {sso_url} in a browser of choice");
+            }
+            Ok(())
+        })
+        .initial_device_display_name("meteorite Client")
+        .await
+        .map_err(|e| LoginError::MatrixError(e.to_string()))?;
+
+    // construct new encrypted account data from response
+    let account_data = EncryptedAccountData::new(
+        response.access_token,
+        response.refresh_token,
+        response.expires_in,
+        response.device_id,
+    );
+
+    // account_data struct -> toml
+    let serialized =
+        toml::to_string(&account_data).map_err(|e| LoginError::IoError(e.to_string()))?;
+
+    // get recipient from passphrase
+    let recipient = age::scrypt::Recipient::new(SecretString::from(encryption_passphrase.as_str()));
+
+    // encrypt account data
+    let encrypted_bytes = age::encrypt(&recipient, serialized.as_bytes())
+        .map_err(|e| LoginError::EncryptionError(e.to_string()))?;
+
+    let encryption_passphrase_entry =
+        Entry::new(APP_NAME, &id).map_err(|e| LoginError::KeyringError(e.to_string()))?;
+
+    // read unencrypted file with all users
+    let mut accounts: AccountList = if users_path.exists() {
+        let toml_account_data =
+            fs::read_to_string(&users_path).map_err(|e| LoginError::IoError(e.to_string()))?;
+        let mut accounts: AccountList = toml::from_str(&toml_account_data)
+            .map_err(|e| LoginError::IoError(e.message().to_string()))?;
+
+        // set all accounts active to false (for the new account to be active)
+        accounts.accounts.iter_mut().for_each(|a| a.active = false);
+        accounts
+    } else {
+        AccountList::default()
+    };
+
+    // add new account to vector
+    accounts.accounts.push(AccountData {
+        id,
+        user_id: response.user_id,
+        active: true,
+    });
+
+    let toml_account_data =
+        toml::to_string(&accounts).map_err(|e| LoginError::IoError(e.to_string()))?;
+
+    // TODO: handle orphaned accounts
+
+    // save encryption passphrase to keyring (used for file encryption and db encryption)
+    encryption_passphrase_entry
+        .set_password(&encryption_passphrase)
+        .map_err(|e| LoginError::KeyringError(e.to_string()))?;
+
+    // write bytes to encrypted file
+    fs::write(&encrypted_path, &encrypted_bytes).map_err(|e| LoginError::IoError(e.to_string()))?;
+
+    // write unecnrypted file
+    fs::write(&users_path, toml_account_data).map_err(|e| LoginError::IoError(e.to_string()))?;
+
     Ok(client)
 }
+
 fn matrix_session_from_account(
     data: &AccountData,
     encrypted: &EncryptedAccountData,
