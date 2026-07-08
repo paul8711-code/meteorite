@@ -12,6 +12,7 @@ pub struct LoginScreen {
     login_rx: Option<mpsc::UnboundedReceiver<String>>,
     error_rx: Option<mpsc::UnboundedReceiver<String>>,
     client_rx: Option<mpsc::UnboundedReceiver<Client>>,
+    sso_link: Option<String>,
     login_error: Option<String>,
     homeserver: String,
     username: String,
@@ -313,7 +314,6 @@ impl LoginScreen {
 
             ui.label("or");
 
-            // TODO: display link (to open)
             {
                 if !self.login_started {
                     if ui
@@ -338,6 +338,7 @@ impl LoginScreen {
                     // must be some at this point
                     self.login_handle.as_mut().unwrap().abort();
                     self.login_started = false;
+                    self.sso_link = None;
                 }
 
                 self.login_recv(state, client);
@@ -424,6 +425,12 @@ impl LoginScreen {
                 *state = UiState::Main;
             }
         }
+
+        if let Some(login_rx) = self.login_rx.as_mut()
+            && let Ok(sso_link) = login_rx.try_recv()
+        {
+            self.sso_link = Some(sso_link);
+        }
     }
 
     fn login_loading(&self, ui: &mut egui::Ui) {
@@ -443,17 +450,33 @@ impl LoginScreen {
             .show(ui.ctx(), |ui| {
                 ui.put(spinner_rect, egui::Spinner::new().size(size));
             });
-    }
-}
 
-/*
-if let Some(rx) = &mut self.login_rx {
-    while let Ok(event) = rx.try_recv() {
-        match event {
-            LoginEvent::Success => { /* ... */ }
-            LoginEvent::Error(msg) => { /* ... */ }
-            _ => {}
-        }
+        egui::Area::new(egui::Id::new("sso_text"))
+            .order(egui::Order::Foreground)
+            .anchor(egui::Align2::CENTER_TOP, egui::vec2(0.0, size * 1.2))
+            .show(ui.ctx(), |ui| {
+                let opacity = {
+                    let fade = ui.ctx().animate_bool_with_time(
+                        ui.make_persistent_id("sso_text_fade_animation"),
+                        self.sso_link.is_some(),
+                        0.25,
+                    );
+                    if self.sso_link.is_some() { fade } else { 0.0 }
+                };
+
+                ui.set_opacity(opacity);
+
+                egui::Frame::window(&ui.global_style())
+                    .corner_radius(10.0)
+                    .fill(egui::Color32::from_rgb(27, 27, 27))
+                    .stroke(egui::Stroke::new(3.0, egui::Color32::from_rgb(60, 60, 60)))
+                    .show(ui, |ui| {
+                        ui.horizontal_centered(|ui| {
+                            if let Some(text) = &self.sso_link {
+                                ui.label(text);
+                            }
+                        });
+                    });
+            });
     }
 }
-*/
