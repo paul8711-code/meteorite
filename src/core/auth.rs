@@ -12,7 +12,7 @@ use matrix_sdk::{
 };
 use rand::distr::{Alphanumeric, SampleString};
 use serde::{Deserialize, Serialize};
-use std::fs;
+use std::{fs, path::PathBuf};
 use tokio::sync::mpsc;
 
 // This file contains all functions for authenticating a user. That includes loading necessary
@@ -67,6 +67,55 @@ impl EncryptedAccountData {
             refresh_token,
             expiration,
             device_id,
+        }
+    }
+}
+
+// guard to clean up failed account creations
+struct AccountCreationGuard {
+    backup_path: PathBuf,
+    backup_created: bool,
+
+    users_path: PathBuf,
+
+    sqlite_path: PathBuf,
+    encrypted_path: PathBuf,
+
+    users_tmp_path: PathBuf,
+    encrypted_tmp_path: PathBuf,
+    backup_tmp_path: PathBuf,
+
+    keyring_entry: Entry,
+    keyring_created: bool,
+
+    committed: bool,
+}
+
+impl AccountCreationGuard {
+    fn commit(mut self) {
+        self.committed = true;
+    }
+}
+
+impl Drop for AccountCreationGuard {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.encrypted_tmp_path);
+        let _ = fs::remove_file(&self.users_tmp_path);
+        let _ = fs::remove_file(&self.backup_tmp_path);
+
+        if self.committed {
+            return;
+        }
+
+        let _ = fs::remove_file(&self.encrypted_path);
+        let _ = fs::remove_dir_all(&self.sqlite_path);
+
+        if self.backup_created {
+            let _ = fs::rename(&self.backup_path, &self.users_path);
+        }
+
+        if self.keyring_created {
+            let _ = self.keyring_entry.delete_credential();
         }
     }
 }
@@ -175,7 +224,11 @@ pub async fn login_sso(
     // define the paths once
     let account_path = utils::unwrap_lock(&ACCOUNT_PATH);
 
+    let backup_tmp_path = account_path.join("users.toml.backup.tmp");
+    let backup_path = account_path.join("users.toml.backup");
+    let users_tmp_path = account_path.join("users.toml.tmp");
     let users_path = account_path.join("users.toml");
+    let encrypted_tmp_path = account_path.join(format!("{id}.enc.tmp"));
     let encrypted_path = account_path.join(format!("{id}.enc"));
     let sqlite_path = account_path.join(&id);
 
@@ -226,18 +279,43 @@ pub async fn login_sso(
 
     let encryption_passphrase_entry = Entry::new(APP_NAME, &id).map_err(|e| anyhow::anyhow!(e))?;
 
+    // create guard as soon as possible
+    let mut guard = AccountCreationGuard {
+        backup_path: backup_path.clone(),
+        backup_tmp_path: backup_tmp_path.clone(),
+        backup_created: false,
+
+        users_path: users_path.clone(),
+
+        sqlite_path: sqlite_path.clone(),
+        encrypted_path: encrypted_path.clone(),
+
+        users_tmp_path: users_tmp_path.clone(),
+        encrypted_tmp_path: encrypted_tmp_path.clone(),
+
+        keyring_entry: encryption_passphrase_entry,
+        keyring_created: false,
+
+        committed: false,
+    };
+
     // read unencrypted file with all users
     let mut accounts: AccountList = if users_path.exists() {
         let toml_account_data = fs::read_to_string(&users_path).map_err(|e| anyhow::anyhow!(e))?;
-        let mut accounts: AccountList =
-            toml::from_str(&toml_account_data).map_err(|e| anyhow::anyhow!(e))?;
-
-        // set all accounts active to false (for the new account to be active)
-        accounts.accounts.iter_mut().for_each(|a| a.active = false);
-        accounts
+        toml::from_str(&toml_account_data).map_err(|e| anyhow::anyhow!(e))?
     } else {
         AccountList::default()
     };
+
+    // create backup of accounts
+    let toml_account_data = toml::to_string(&accounts).map_err(|e| anyhow::anyhow!(e))?;
+    fs::write(&backup_tmp_path, &toml_account_data).map_err(|e| anyhow::anyhow!(e))?;
+    fs::rename(&backup_tmp_path, &backup_path).map_err(|e| anyhow::anyhow!(e))?;
+
+    guard.backup_created = true;
+
+    // set all accounts active to false (for the new account to be active)
+    accounts.accounts.iter_mut().for_each(|a| a.active = false);
 
     // add new account to vector
     accounts.accounts.push(AccountData {
@@ -248,18 +326,27 @@ pub async fn login_sso(
 
     let toml_account_data = toml::to_string(&accounts).map_err(|e| anyhow::anyhow!(e))?;
 
-    // TODO: handle orphaned accounts
+    // write bytes to encrypted file
+    fs::write(&encrypted_tmp_path, &encrypted_bytes).map_err(|e| anyhow::anyhow!(e))?;
+
+    fs::rename(&encrypted_tmp_path, &encrypted_path).map_err(|e| anyhow::anyhow!(e))?;
+
+    // write unecnrypted file
+    fs::write(&users_tmp_path, toml_account_data).map_err(|e| anyhow::anyhow!(e))?;
+
+    fs::rename(&users_tmp_path, &users_path).map_err(|e| anyhow::anyhow!(e))?;
 
     // save encryption passphrase to keyring (used for file encryption and db encryption)
-    encryption_passphrase_entry
+    guard
+        .keyring_entry
         .set_password(&encryption_passphrase)
         .map_err(|e| anyhow::anyhow!(e))?;
 
-    // write bytes to encrypted file
-    fs::write(&encrypted_path, &encrypted_bytes).map_err(|e| anyhow::anyhow!(e))?;
+    guard.keyring_created = true;
 
-    // write unecnrypted file
-    fs::write(&users_path, toml_account_data).map_err(|e| anyhow::anyhow!(e))?;
+    let _ = fs::remove_file(&backup_path);
+
+    guard.commit();
 
     Ok(client)
 }
