@@ -1,62 +1,43 @@
 use super::{Arc, ErrorKind, Mutex, UiState, egui, widgets};
 
 #[derive(Default)]
-pub struct ErrorScreen {
-    should_fade: bool,
-}
+pub struct ErrorScreen;
 
 impl ErrorScreen {
     pub fn show(
-        &mut self,
         ui: &mut egui::Ui,
         state: &mut Arc<Mutex<UiState>>,
-        err: (ErrorKind, String),
+        kind: &ErrorKind,
+        message: &str,
     ) {
-        match err {
-            (ErrorKind::NoAccountActive, _) => {
+        match kind {
+            ErrorKind::NoAccountActive => {
                 if let Ok(mut state) = state.lock() {
                     *state = UiState::Login;
                 }
             }
-            (ErrorKind::Other, message) => self.display_error(ui, &message),
+            ErrorKind::Other => Self::display_error(ui, message),
         }
-        self.should_fade = true;
     }
 
-    fn display_error(&self, ui: &mut egui::Ui, err: &str) {
-        egui::Panel::bottom("login_bottom_panel")
-            .resizable(false)
-            .exact_size(50.0)
-            .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.label(env!("CARGO_PKG_VERSION"));
-                });
-            });
+    fn display_error(ui: &mut egui::Ui, err: &str) {
+        widgets::bottom_info_bar(ui);
 
         egui::CentralPanel::default().show(ui, |ui| {
-            ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
-                ui.painter().add(egui::Shape::gradient_rect(
-                    ui.ctx().viewport_rect(),
-                    egui::Direction::TopDown,
-                    [
-                        egui::Color32::from_rgb(20, 20, 20),
-                        egui::Color32::from_rgb(0, 0, 60),
-                    ],
-                ));
-            });
+            widgets::draw_bg(ui);
 
             egui::Area::new("error_area".into())
                 .anchor(egui::Align2::CENTER_TOP, [0.0, 50.0])
                 .show(ui, |ui| {
                     let opacity = ui.ctx().animate_bool_with_time(
-                        ui.make_persistent_id("error_fade_animation"),
-                        self.should_fade,
+                        ui.make_persistent_id(("error_screen", "fade")),
+                        true,
                         0.25,
                     );
 
                     ui.set_opacity(opacity);
 
-                    ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
+                    ui.vertical_centered(|ui| {
                         egui::Frame::window(&ui.global_style())
                             .corner_radius(10.0)
                             .fill(egui::Color32::from_rgb(255, 120, 120))
@@ -70,7 +51,7 @@ impl ErrorScreen {
 
                         ui.add_space(50.0);
 
-                        widgets::add_icon(ui, egui::Vec2 { x: 256.0, y: 256.0 });
+                        widgets::add_icon(ui, egui::Vec2::splat(256.0));
                     });
                 });
         });

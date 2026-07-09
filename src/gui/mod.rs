@@ -68,7 +68,6 @@ struct App {
     login_screen: login::LoginScreen,
     loading_screen: loading::LoadingScreen,
     main_screen: main::MainScreen,
-    error_screen: error::ErrorScreen,
     client: Option<Client>,
 }
 
@@ -94,7 +93,6 @@ impl App {
             login_screen: login::LoginScreen::default(),
             loading_screen: loading::LoadingScreen::default(),
             main_screen: main::MainScreen,
-            error_screen: error::ErrorScreen::default(),
             client: None,
         }
     }
@@ -113,8 +111,7 @@ impl eframe::App for App {
         match state {
             UiState::Loading => self.loading_screen.show(ui, &mut self.current_state),
             UiState::Error { kind, message } => {
-                self.error_screen
-                    .show(ui, &mut self.current_state, (kind, message));
+                error::ErrorScreen::show(ui, &mut self.current_state, &kind, &message);
             }
             UiState::Main => self.main_screen.show(ui),
             UiState::Login => self

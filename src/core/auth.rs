@@ -193,7 +193,6 @@ pub async fn login_sso(
     let response = client
         .matrix_auth()
         .login_sso(|sso_url| async move {
-            // TODO: let ui know about the url
             if webbrowser::open(&sso_url).is_ok() {
                 tx.send("Go to the opened website to authenticate".to_string())
                     .ok();

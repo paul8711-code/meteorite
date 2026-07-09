@@ -9,32 +9,16 @@ pub struct LoadingScreen {
 
 impl LoadingScreen {
     pub fn show(&mut self, ui: &mut egui::Ui, state: &mut Arc<Mutex<UiState>>) {
-        egui::Panel::bottom("login_bottom_panel")
-            .resizable(false)
-            .exact_size(50.0)
-            .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.label(env!("CARGO_PKG_VERSION"));
-                });
-            });
+        widgets::bottom_info_bar(ui);
 
         egui::CentralPanel::default().show(ui, |ui| {
-            ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
-                ui.painter().add(egui::Shape::gradient_rect(
-                    ui.ctx().viewport_rect(),
-                    egui::Direction::TopDown,
-                    [
-                        egui::Color32::from_rgb(20, 20, 20),
-                        egui::Color32::from_rgb(0, 0, 60),
-                    ],
-                ));
-            });
+            widgets::draw_bg(ui);
 
             ui.scope(|ui| {
                 if let Ok(mut opacity) = self.opacity.lock() {
                     if let Ok(should_fade) = self.should_fade.lock() {
                         *opacity = ui.ctx().animate_bool_with_time(
-                            ui.make_persistent_id("loading_fade_animation"),
+                            ui.make_persistent_id(("loading_screen", "fade")),
                             !*should_fade,
                             0.25,
                         );
@@ -50,7 +34,7 @@ impl LoadingScreen {
 
                 ui.with_layout(egui::Layout::top_down(egui::Align::Center), |ui| {
                     ui.add_space(50.0);
-                    widgets::add_icon(ui, egui::Vec2 { x: 256.0, y: 256.0 });
+                    widgets::add_icon(ui, egui::Vec2::splat(256.0));
                 });
 
                 egui::widgets::Spinner::new().paint_at(ui, centered_rect);
