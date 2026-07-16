@@ -12,6 +12,7 @@ use matrix_sdk::{
 };
 use rand::distr::{Alphanumeric, SampleString};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::{fs, path::PathBuf};
 use tokio::sync::mpsc;
 
@@ -120,6 +121,21 @@ impl Drop for AccountCreationGuard {
     }
 }
 
+#[derive(Debug)]
+enum AccountResource {
+    Folder(String, PathBuf),
+    File(String, PathBuf),
+    KeyringEntry(String),
+    User(String),
+}
+
+const USER: u8 = 1 << 0;
+const FILE: u8 = 1 << 1;
+const FOLDER: u8 = 1 << 2;
+const KEYRING: u8 = 1 << 3;
+
+const ALL: u8 = USER | FILE | FOLDER | KEYRING;
+
 // custom error type to let the ui know what to display
 #[derive(thiserror::Error, Debug)]
 pub enum LoginError {
@@ -133,6 +149,9 @@ pub enum LoginError {
 
 // logs in active account by restoring persisted matrix session
 pub async fn login() -> Result<Client, LoginError> {
+    // first remove possible leftovers
+    remove_orphaned_accounts();
+
     let account_path = utils::unwrap_lock(&ACCOUNT_PATH);
     let users_path = account_path.join("users.toml");
 
@@ -211,6 +230,9 @@ pub async fn login_sso(
     homeserver: &str,
     tx: mpsc::UnboundedSender<String>,
 ) -> Result<Client, LoginError> {
+    // first remove possible leftovers
+    remove_orphaned_accounts();
+
     // initialize rng for later usage
     let (id, encryption_passphrase) = {
         let mut rng = rand::rng();
@@ -366,6 +388,134 @@ fn matrix_session_from_account(
         },
     }
 }
+
+fn remove_orphaned_accounts() {
+    let account_path = utils::unwrap_lock(&ACCOUNT_PATH);
+    let users_path = account_path.join("users.toml");
+
+    if !users_path.exists() {
+        return;
+    }
+
+    // - collect vector of:
+    //  - sqlite folders
+    //  - encrypted files
+    //  - accounts
+    //  - keyring entries
+    let mut resources = Vec::new();
+
+    // get the user list
+    let Ok(toml_account_data) = fs::read_to_string(&users_path) else {
+        return;
+    };
+
+    let mut accounts: AccountList = match toml::from_str(&toml_account_data) {
+        Ok(data) => data,
+        Err(_) => return,
+    };
+
+    resources.extend(
+        accounts
+            .accounts
+            .iter()
+            .map(|account| AccountResource::User(account.id.clone())),
+    );
+
+    for entry in match fs::read_dir(&account_path) {
+        Ok(entries) => entries,
+        Err(_) => return,
+    }
+    .flatten()
+    {
+        // collect everything into resources vec
+        let path = entry.path();
+
+        // filter out only the folders
+        if path.is_dir()
+            && let Some(name) = entry.file_name().to_str().map(str::to_owned)
+        {
+            resources.push(AccountResource::Folder(name, path.clone()));
+        }
+
+        // filter out only the files except the users.toml file (so it doesnt get deleted)
+        if path.is_file()
+            && path != users_path
+            && let Some(name) = entry.file_name().to_str().map(str::to_owned)
+        {
+            resources.push(AccountResource::File(name, path));
+        }
+    }
+
+    match Entry::search(&[("service", APP_NAME)].into()) {
+        Ok(entries) => resources.extend(
+            entries
+                .iter()
+                .filter_map(|entry| Some(AccountResource::KeyringEntry(entry.get_specifiers()?.1))),
+        ),
+        Err(_) => return,
+    }
+
+    // all values in resource vector now
+
+    // hashmap of all seen (if all are seen: 1111, each bit represents one variant seen)
+    let mut seen: HashMap<&str, u8> = HashMap::new();
+
+    for resource in &resources {
+        let (name, bit) = match resource {
+            AccountResource::User(s) => (s.as_str(), USER),
+            AccountResource::File(s, _) => (s.as_str(), FILE),
+            AccountResource::Folder(s, _) => (s.as_str(), FOLDER),
+            AccountResource::KeyringEntry(s) => (s.as_str(), KEYRING),
+        };
+
+        *seen.entry(name).or_default() |= bit;
+    }
+
+    for resource in &resources {
+        let name = match resource {
+            AccountResource::User(s)
+            | AccountResource::File(s, _)
+            | AccountResource::Folder(s, _)
+            | AccountResource::KeyringEntry(s) => s.as_str(),
+        };
+
+        if let Some(mask) = seen.get(name)
+            && *mask != ALL
+        {
+            match resource {
+                AccountResource::File(_, path) => {
+                    // delete file
+                    fs::remove_file(path).ok();
+                }
+
+                AccountResource::Folder(_, path) => {
+                    // delete folder
+                    fs::remove_dir_all(path).ok();
+                }
+
+                AccountResource::KeyringEntry(name) => {
+                    // delete keyring entry
+                    let Ok(entry) = Entry::new(APP_NAME, name) else {
+                        return;
+                    };
+                    entry.delete_credential().ok();
+                }
+
+                AccountResource::User(s) => {
+                    // remove user from users.toml
+                    accounts.accounts.retain(|account| &account.id != s);
+                }
+            }
+        }
+    }
+
+    let Ok(toml_account_data) = toml::to_string(&accounts) else {
+        return;
+    };
+
+    fs::write(&users_path, toml_account_data).ok();
+}
+
 /*
 pub async fn login(
     app_name: &str,
