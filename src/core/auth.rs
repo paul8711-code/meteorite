@@ -353,7 +353,7 @@ pub async fn login_sso(
 
     fs::rename(&encrypted_tmp_path, &encrypted_path).map_err(|e| anyhow::anyhow!(e))?;
 
-    // write unecnrypted file
+    // write unencrypted file
     fs::write(&users_tmp_path, toml_account_data).map_err(|e| anyhow::anyhow!(e))?;
 
     fs::rename(&users_tmp_path, &users_path).map_err(|e| anyhow::anyhow!(e))?;
