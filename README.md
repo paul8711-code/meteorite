@@ -7,10 +7,8 @@
   Fast, Secure & Easy-to-use Matrix client in Rust
 </p>
 
-### Progress
-![](https://geps.dev/progress/23.08?barColor=3483eb)
-
 ### Todo
+
 - [x] Login (SSO & Username)
 - [x] Persistent session
 - [ ] Device verification (Emoji & QR)
