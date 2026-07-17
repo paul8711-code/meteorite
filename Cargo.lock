@@ -3765,6 +3765,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "toml 1.1.3+spec-1.1.0",
+ "url",
  "webbrowser",
  "windows-native-keyring-store",
  "zbus-secret-service-keyring-store",

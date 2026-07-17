@@ -6,6 +6,7 @@ use matrix_sdk::{
     authentication::matrix::MatrixSession,
     ruma::{
         OwnedDeviceId, OwnedUserId,
+        api::client::session::get_login_types::v3::{IdentityProvider, LoginType},
         time::{Duration, SystemTime},
     },
     store::RoomLoadSettings,
@@ -136,6 +137,16 @@ const KEYRING: u8 = 1 << 3;
 
 const ALL: u8 = USER | FILE | FOLDER | KEYRING;
 
+pub enum LoginChoice {
+    Password,
+    Sso {
+        identity_provider: Option<IdentityProvider>,
+    },
+    Oauth {
+        preferred: bool,
+    },
+}
+
 // custom error type to let the ui know what to display
 #[derive(thiserror::Error, Debug)]
 pub enum LoginError {
@@ -143,6 +154,54 @@ pub enum LoginError {
     NoAccountActive,
     #[error(transparent)]
     Other(#[from] anyhow::Error),
+}
+
+// checks which login types are supported, filtering out reduntant ones
+pub async fn get_login_types(homeserver: &str) -> anyhow::Result<Vec<LoginChoice>> {
+    let homeserver_url = url::Url::parse(homeserver)?;
+    let client = Client::new(homeserver_url).await?;
+
+    let mut types = Vec::new();
+    let login_types = client.matrix_auth().get_login_types().await?.flows;
+    let oauth_supported = client.oauth().server_metadata().await.is_ok();
+
+    for login_type in &login_types {
+        match login_type {
+            LoginType::Password(_) => types.push(LoginChoice::Password),
+            LoginType::Sso(sso) => {
+                if sso.oauth_aware_preferred && oauth_supported {
+                    types.push(LoginChoice::Oauth { preferred: true });
+                }
+                // check for token type, if unsupported login_token will fail
+                if login_types.iter().any(|x| matches!(x, LoginType::Token(_))) {
+                    if sso.identity_providers.is_empty() {
+                        types.push(LoginChoice::Sso {
+                            identity_provider: None,
+                        });
+                    } else {
+                        types.extend(sso.identity_providers.clone().into_iter().map(
+                            |identity_provider| LoginChoice::Sso {
+                                identity_provider: Some(identity_provider),
+                            },
+                        ));
+                    }
+                }
+            }
+            // we dont support ApplicationService login, Token login is already checked for above
+            _ => {}
+        }
+    }
+
+    if !types
+        .iter()
+        .any(|x| matches!(x, LoginChoice::Oauth { preferred: true }))
+        && oauth_supported
+    {
+        types.push(LoginChoice::Oauth { preferred: false });
+    }
+
+    // ui has to handle empty types
+    Ok(types)
 }
 
 // TODO: split functions into helpers
