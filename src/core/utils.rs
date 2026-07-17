@@ -20,7 +20,7 @@ pub fn show_dialog_window(title: impl ToString, text: impl ToString, level: Mess
         .unwrap();
 }
 
-// parses and app id into the data dir (absolute path)
+// parses an app id into the data dir (absolute path)
 pub fn local_data_dir(app_id: &str) -> Option<PathBuf> {
     let mut parts = app_id.splitn(3, '.');
 
