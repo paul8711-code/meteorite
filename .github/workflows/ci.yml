@@ -4,11 +4,21 @@ on:
   workflow_dispatch:
   
   push:
-    paths: [".cargo/**", "src/**", "tests/**", "Cargo.*"]
+    paths: 
+      - "**/src/**"
+      - "**/tests/**"
+      - "**/Cargo.toml"
+      - ".cargo/**"
+      - "Cargo.*"
     branches: [main]
 
   pull_request:
-    paths: [".cargo/**", "src/**", "tests/**", "Cargo.*"]
+    paths: 
+      - "**/src/**"
+      - "**/tests/**"
+      - "**/Cargo.toml"
+      - ".cargo/**"
+      - "Cargo.*"
     branches: [main]
 
 defaults:
