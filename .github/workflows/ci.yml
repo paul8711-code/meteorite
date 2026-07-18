@@ -1,6 +1,8 @@
 name: CI Pipeline
 
 on:
+  workflow_dispatch:
+  
   push:
     paths: [".cargo/**", "src/**", "tests/**", "Cargo.*"]
     branches: [main]
