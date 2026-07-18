@@ -1,35 +1,35 @@
-use crate::{ACCOUNT_PATH, APP_NAME, BASE_PATH};
-use native_dialog::MessageLevel;
+use crate::{ACCOUNT_PATH, APP_NAME, BASE_PATH, utils};
 use std::fs;
 use std::sync::Mutex;
 
-use crate::core::utils;
-
 // all functions in this file are used to inititalize something (e.g. set default keyring store)
 
-// this function calls all other init functions and handles errors, if any
-// interesting return type, i know but it lets main know that there was an error and drop _guard safely
-pub fn setup() -> Result<(), ()> {
+pub enum SetupError {
+    /// An error occured when setting up the default keyring store
+    Keyring(String),
+    /// An error occured when creating necessary directories
+    Folder(String),
+}
+
+/// Initializes important variables and sets the default keyring store.
+///
+/// # Errors
+/// If any of the setup steps fail, an error containing the message for the UI to display is returned.
+pub fn setup() -> Result<(), SetupError> {
     match setup_keyring() {
         Ok(()) => {}
         Err(e) => {
-            utils::show_dialog_window(
-                "Keyring Error",
-                format!("The application failed to set up the keyring store.\n\nDetails: {e}"),
-                MessageLevel::Error,
-            );
-            return Err(());
+            return Err(SetupError::Keyring(format!(
+                "The application failed to set up the keyring store.\n\nDetails: {e}"
+            )));
         }
     }
     match setup_folders() {
         Ok(()) => {}
         Err(e) => {
-            utils::show_dialog_window(
-                "Folder Error",
-                format!("The application failed to set up required folders.\n\nDetails: {e}"),
-                MessageLevel::Error,
-            );
-            return Err(());
+            return Err(SetupError::Folder(format!(
+                "The application failed to set up required folders.\n\nDetails: {e}"
+            )));
         }
     }
     Ok(())

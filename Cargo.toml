@@ -1,33 +1,6 @@
-[package]
-name = "meteorite"
-version = "0.1.0"
-edition = "2024"
-authors = ["Paul8711 <contact@paul8711.com>"]
-description = "Fast, Secure & Easy-to-use Matrix client in Rust"
-license = "AGPL-3.0-only"
-repository = "https://github.com/paul8711-code/meteorite"
+[workspace]
+members = ["meteorite-core", "meteorite-ui"]
+resolver = "3"
 
-[dependencies]
-age = "0.12.1"
-anyhow = "1.0.102"
-directories = "6.0.0"
-eframe = "0.35.0"
-egui_extras = { version = "0.35.0", features = ["all_loaders"] }
-keyring-core = "1.0.0"
-matrix-sdk = { version = "0.18.0", features = ["sqlite", "e2e-encryption", "automatic-room-key-forwarding", "qrcode", "sso-login"] }
-native-dialog = "0.9.7"
-rand = "0.10.1"
-serde = { version = "1.0.228", features = ["derive"] }
-thiserror = "2.0.18"
+[workspace.dependencies]
 tokio = { version = "1.50.0", features = ["full"] }
-toml = "1.1.2"
-url = "2.5.8"
-webbrowser = "1.2.0"
-[target.'cfg(target_os = "windows")'.dependencies]
-windows-native-keyring-store = "1.1.0"
-
-[target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
-zbus-secret-service-keyring-store = { version = "1.0.0", features = ["crypto-rust"] }
-
-[target.'cfg(target_os = "macos")'.dependencies]
-apple-native-keyring-store = "1.0.0"

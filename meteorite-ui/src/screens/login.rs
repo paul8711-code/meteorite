@@ -1,4 +1,4 @@
-use super::{Arc, Client, ErrorKind, LoginStage, Mutex, UiState, auth, egui, widgets};
+use super::{Arc, Client, LoginStage, Mutex, UiState, auth, egui, widgets};
 use tokio::{sync::mpsc, task::JoinHandle};
 
 const BUTTON_SIZE: egui::Vec2 = egui::vec2(280.0, 40.0);
@@ -229,7 +229,7 @@ impl LoginScreen {
                     .clicked()
                 {
                     self.login_error = None;
-                    self.start_login_homeserver(ui.ctx().clone(), state);
+                    self.start_login_homeserver();
                 }
             } else if ui
                 .add(
@@ -261,12 +261,11 @@ impl LoginScreen {
         });
     }
 
-    fn start_login_homeserver(&mut self, ctx: egui::Context, state: &mut Arc<Mutex<UiState>>) {
+    fn start_login_homeserver(&mut self) {
         let (login_tx, login_rx) = mpsc::unbounded_channel();
         let (client_tx, client_rx) = mpsc::unbounded_channel();
         let (error_tx, error_rx) = mpsc::unbounded_channel();
 
-        let state_clone = Arc::clone(state);
         let homeserver_clone = self.homeserver.clone();
 
         let login_handle = tokio::spawn(async move {
@@ -277,20 +276,7 @@ impl LoginScreen {
                     client_tx.send(client).ok();
                 }
                 Err(ref e) => {
-                    if let Ok(mut state) = state_clone.lock() {
-                        match e {
-                            auth::LoginError::NoAccountActive => {
-                                *state = UiState::Error {
-                                    kind: ErrorKind::NoAccountActive,
-                                    message: e.to_string(),
-                                }
-                            }
-                            auth::LoginError::Other(_) => {
-                                error_tx.send(e.to_string()).ok();
-                            }
-                        }
-                        ctx.request_repaint();
-                    }
+                    error_tx.send(e.to_string()).ok();
                 }
             }
         });

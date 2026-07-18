@@ -1,4 +1,4 @@
-use crate::{ACCOUNT_PATH, APP_NAME, core::utils};
+use crate::{ACCOUNT_PATH, APP_NAME, utils};
 use age::secrecy::SecretString;
 use keyring_core::Entry;
 use matrix_sdk::{
@@ -138,11 +138,16 @@ const KEYRING: u8 = 1 << 3;
 const ALL: u8 = USER | FILE | FOLDER | KEYRING;
 
 pub enum LoginChoice {
+    /// Password login
     Password,
+    /// SSO login
     Sso {
+        /// The identity provider (e.g. Github)
         identity_provider: Option<IdentityProvider>,
     },
+    /// OAuth 2.0 login
     Oauth {
+        /// Wether the client should ignore all other methods and only advertise OAuth
         preferred: bool,
     },
 }
@@ -156,7 +161,13 @@ pub enum LoginError {
     Other(#[from] anyhow::Error),
 }
 
-// checks which login types are supported, filtering out reduntant ones
+/// Retrieves all supported login types for a given homeserver.
+///
+/// Returns an empty list if no compatible login methods (like Password,
+/// SSO, or OAuth) are discovered. The UI must handle this fallback.
+///
+/// # Errors
+/// An error will be returned if connecting to the homeserver or any requests fail.
 pub async fn get_login_types(homeserver: &str) -> anyhow::Result<Vec<LoginChoice>> {
     let homeserver_url = url::Url::parse(homeserver)?;
     let client = Client::new(homeserver_url).await?;
@@ -206,7 +217,14 @@ pub async fn get_login_types(homeserver: &str) -> anyhow::Result<Vec<LoginChoice
 
 // TODO: split functions into helpers
 
-// logs in active account by restoring persisted matrix session
+/// Tries to log the user into the currently active account.
+///
+/// Also reads the files necessary to login the user (users.toml, encrypted files, keyring entry).
+/// On success, an authenticated Client is returned.
+///
+/// # Errors
+/// Returns the [`LoginError::NoAccountActive`] variant if no account or multiple accounts are
+/// currently active. On any other error, the [`LoginError::Other`] variant is returned.
 pub async fn login() -> Result<Client, LoginError> {
     // first remove possible leftovers
     remove_orphaned_accounts();
@@ -284,11 +302,17 @@ pub async fn login() -> Result<Client, LoginError> {
     Ok(client)
 }
 
-// authenticates a user via sso and saves the account config locally
+/// Tries to log a user in via their homeserver.
+///
+/// Also saves the new data (users.toml, encrypted file, keyring entry)
+/// On success, an authenticated Client is returned.
+///
+/// # Errors
+/// Can return any error if something fails in the process.
 pub async fn login_sso(
     homeserver: &str,
     tx: mpsc::UnboundedSender<String>,
-) -> Result<Client, LoginError> {
+) -> anyhow::Result<Client> {
     // first remove possible leftovers
     remove_orphaned_accounts();
 

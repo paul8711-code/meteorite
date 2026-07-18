@@ -1,11 +1,13 @@
-use crate::APP_NAME;
-use crate::core::{auth, utils};
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use eframe::egui;
-use matrix_sdk::Client;
+use meteorite_core::Client;
+use meteorite_core::{APP_NAME, auth, init};
 use native_dialog::MessageLevel;
 use std::sync::{Arc, Mutex};
 
 mod screens;
+mod utils;
 mod widgets;
 
 use screens::{error, loading, login, main};
@@ -31,9 +33,25 @@ enum ErrorKind {
     Other,
 }
 
-static ICON: &[u8] = include_bytes!("../../assets/icon/icon.png");
+#[tokio::main]
+async fn main() {
+    // all errors are handled within the setup function
+    if let Err(e) = init::setup() {
+        match e {
+            init::SetupError::Keyring(s) => {
+                utils::show_dialog_window("Keyring Error", s, MessageLevel::Error);
+            }
+            init::SetupError::Folder(s) => {
+                utils::show_dialog_window("Folder Error", s, MessageLevel::Error);
+            }
+        }
+        return;
+    }
+    let _keyring_guard = meteorite_core::KeyringGuard;
+    run();
+}
 
-pub fn main() {
+fn run() {
     let native_options = eframe::NativeOptions {
         viewport: egui::viewport::ViewportBuilder {
             app_id: Some(APP_NAME.to_owned()),
@@ -62,6 +80,8 @@ pub fn main() {
         }
     }
 }
+
+static ICON: &[u8] = include_bytes!("../../assets/icon/icon.png");
 
 struct App {
     current_state: Arc<Mutex<UiState>>,
