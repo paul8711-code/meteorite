@@ -1,0 +1,22 @@
+# TODO
+
+- [ ] Registration
+- [ ] Login
+  - [x] SSO
+  - [ ] OAuth
+  - [ ] Username
+  - [ ] hook get_login_types up in UI
+- [x] Persistent session
+- [ ] Device verification (Emoji & QR)
+- [ ] Sending & receiving messages
+- [ ] Multi-Account
+- [ ] VoIP (1:1 & Jitsi)
+- [ ] Spaces & Rooms (joining and managing)
+- [ ] Threads
+- [ ] Account managment
+- [ ] GUI
+  - [ ] rewrite using dioxus -> feat/ui-rewrite
+- [ ] GIF Search
+- [ ] Write documentation
+- [ ] Handle refreshing of access token
+- [ ] Handle soft_logout

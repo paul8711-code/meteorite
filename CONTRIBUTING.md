@@ -64,3 +64,5 @@ We value human-authored code where the contributor deeply understands the logic,
    * **`chore/`**: For maintenance, dependency updates or documentation tweaks (e.g. `chore/update-readme`).
 
    *Note: Branches that do not follow our naming structure will fail automated CI checks and will not be merged.*
+
+3. Check out [`TODO.md`](TODO.md) or search for comments in code starting with `TODO`

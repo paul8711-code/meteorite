@@ -6,16 +6,3 @@
 <p align="center">
   Fast, Secure & Easy-to-use Matrix client in Rust
 </p>
-
-### Todo
-
-- [ ] Registration
-- [ ] Login (SSO, OAuth & Username)
-- [x] Persistent session
-- [ ] Device verification (Emoji & QR)
-- [ ] Sending & receiving messages
-- [ ] Multi-Account
-- [ ] VoIP (1:1 & Jitsi)
-- [ ] Spaces & Rooms (joining and managing)
-- [ ] Threads
-- [ ] Account managing
