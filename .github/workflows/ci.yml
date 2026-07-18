@@ -4,30 +4,39 @@ on:
   workflow_dispatch:
   
   push:
-    paths: 
-      - "**/src/**"
-      - "**/tests/**"
-      - "**/Cargo.toml"
-      - ".cargo/**"
-      - "Cargo.*"
-    branches: [main]
+    branches:
+      - main
 
   pull_request:
-    paths: 
-      - "**/src/**"
-      - "**/tests/**"
-      - "**/Cargo.toml"
-      - ".cargo/**"
-      - "Cargo.*"
-    branches: [main]
+    branches:
+      - main
 
 defaults:
   run:
     shell: bash
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      important: ${{ steps.filter.outputs.important }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            important:
+              - "**/src/**"
+              - "**/tests/**"
+              - "**/Cargo.toml"
+              - ".cargo/**"
+              - "Cargo.*"
+              
   ci:
     name: Checks
+    needs: changes
+    if: ${{ needs.changes.outputs.important == 'true' }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
