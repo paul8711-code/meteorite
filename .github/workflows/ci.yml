@@ -1,0 +1,52 @@
+name: CI Pipeline
+
+on:
+  push:
+    paths: [".cargo/**", "src/**", "tests/**", "Cargo.*"]
+    branches: [main]
+
+  pull_request:
+    paths: [".cargo/**", "src/**", "tests/**", "Cargo.*"]
+    branches: [main]
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  ci:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Prexec (Environment Setup)
+        run: |
+          case "${{ matrix.os }}" in
+            *'windows'*)
+              echo "OPENSSL_SRC_PERL=C:/Strawberry/perl/bin/perl" | tee -a "$GITHUB_ENV"
+              ;;
+          esac
+          cargo update
+
+      - name: Formatting Check
+        run: cargo fmt --all --check
+
+      - name: Clippy Check
+        run: cargo clippy --all-targets --all-features --workspace -- -D warnings
+
+      - name: Run Tests
+        run: cargo test --all-features --workspace
