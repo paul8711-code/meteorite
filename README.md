@@ -9,7 +9,7 @@
 
 ### Todo
 
-- [x] Login (SSO & Username)
+- [ ] Login (SSO & Username)
 - [x] Persistent session
 - [ ] Device verification (Emoji & QR)
 - [ ] Sending & receiving messages
