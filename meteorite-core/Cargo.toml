@@ -10,7 +10,7 @@ anyhow = "1.0.102"
 directories = "6.0.0"
 keyring-core = "1.0.0"
 matrix-sdk = { version = "0.18.0", features = [
-    "sqlite",
+    "bundled-sqlite",
     "e2e-encryption",
     "automatic-room-key-forwarding",
     "qrcode",
