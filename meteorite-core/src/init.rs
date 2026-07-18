@@ -42,7 +42,8 @@ fn setup_keyring() -> anyhow::Result<()> {
     #[cfg(target_os = "windows")]
     keyring_core::set_default_store(windows_native_keyring_store::Store::new()?);
     #[cfg(target_os = "macos")]
-    keyring_core::set_default_store(apple_native_keyring_store::Store::new()?);
+    // TODO: transition to protected in the future?
+    keyring_core::set_default_store(apple_native_keyring_store::keychain::Store::new()?);
     Ok(())
 }
 

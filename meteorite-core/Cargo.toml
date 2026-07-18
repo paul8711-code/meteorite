@@ -33,4 +33,5 @@ zbus-secret-service-keyring-store = { version = "1.0.0", features = [
 ] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
+# TODO: transition to protected in the future?
 apple-native-keyring-store = { version = "1.0.0", features = ["keychain"] }
