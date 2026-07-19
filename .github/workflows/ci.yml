@@ -1,4 +1,4 @@
-name: CI Pipeline
+name: Rust Checks
 
 on:
   workflow_dispatch:
