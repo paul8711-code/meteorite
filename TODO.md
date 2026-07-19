@@ -20,3 +20,4 @@
 - [ ] Write documentation
 - [ ] Handle refreshing of access token
 - [ ] Handle soft_logout
+- ... and more according to [this](https://spec.matrix.org/v1.19/client-server-api/#summary) (will be added to list later)
