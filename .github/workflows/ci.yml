@@ -33,8 +33,8 @@ jobs:
               - ".cargo/**"
               - "Cargo.*"
               
-  rust-checks:
-    name: Rust Checks
+  run-checks:
+    name: Run Checks
     needs: changes
     if: ${{ needs.changes.outputs.important == 'true' }}
     runs-on: ${{ matrix.os }}
@@ -80,7 +80,7 @@ jobs:
       if: always()
       steps:
         - run: |
-            if [ "${{ needs.changes.result }}" = "failure" ] || [ "${{ needs.rust-checks.result }}" = "failure" ]; then
+            if [ "${{ needs.changes.result }}" = "failure" ] || [ "${{ needs.run-checks.result }}" = "failure" ]; then
               exit 1
             fi
             exit 0
