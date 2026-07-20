@@ -33,7 +33,7 @@ jobs:
               - ".cargo/**"
               - "Cargo.*"
               
-  ci:
+  checks:
     name: Checks
     needs: changes
     if: ${{ needs.changes.outputs.important == 'true' }}
