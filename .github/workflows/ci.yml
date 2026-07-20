@@ -33,8 +33,8 @@ jobs:
               - ".cargo/**"
               - "Cargo.*"
               
-  run-checks:
-    name: Run Checks
+  checks:
+    name: Checks
     needs: changes
     if: ${{ needs.changes.outputs.important == 'true' }}
     runs-on: ${{ matrix.os }}
@@ -72,15 +72,3 @@ jobs:
 
       - name: Run Tests
         run: cargo test --all-features --workspace
-
-  checks:
-    - name: Checks
-      runs-on: ubuntu-latest
-      needs: [changes, rust-checks]
-      if: always()
-      steps:
-        - run: |
-            if [ "${{ needs.changes.result }}" = "failure" ] || [ "${{ needs.run-checks.result }}" = "failure" ]; then
-              exit 1
-            fi
-            exit 0
