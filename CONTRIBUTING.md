@@ -63,6 +63,6 @@ We value human-authored code where the contributor deeply understands the logic,
    * **`fix/`**: For fixing broken code or resolving panics (e.g. `fix/prevent-overflow`).
    * **`chore/`**: For maintenance, dependency updates or documentation tweaks (e.g. `chore/update-readme`).
 
-   *Note: Branches that do not follow our naming structure will not be merged.*
-
 3. Check out [`TODO.md`](TODO.md) or search for comments in code starting with `TODO`
+
+**Branches that do not follow our rules will not be merged.**
