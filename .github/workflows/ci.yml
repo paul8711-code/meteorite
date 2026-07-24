@@ -75,14 +75,14 @@ jobs:
 
   checks:
     name: Checks
-    needs: [changes, checks]
+    needs: [changes, run-checks]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Checks Status
         run: |
           if [ "${{ needs.changes.outputs.important }}" = "true" ]; then
-            if [ "${{ needs.checks.result }}" != "success" ]; then
+            if [ "${{ needs.run-checks.result }}" != "success" ]; then
               echo "Rust checks failed"
               exit 1
             fi
