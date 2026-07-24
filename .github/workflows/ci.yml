@@ -33,9 +33,10 @@ jobs:
               - ".cargo/**"
               - "Cargo.*"
               
-  checks:
-    name: Checks
+  run-checks:
+    name: Run Checks
     needs: changes
+    if: needs.changes.outputs.important == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -64,13 +65,26 @@ jobs:
           cargo update
 
       - name: Formatting Check
-        if: needs.changes.outputs.important == 'true'
         run: cargo fmt --all --check
 
       - name: Clippy Check
-        if: needs.changes.outputs.important == 'true'
         run: cargo clippy --all-targets --all-features --workspace -- -D warnings
 
       - name: Run Tests
-        if: needs.changes.outputs.important == 'true'
         run: cargo test --all-features --workspace
+
+  checks:
+    name: Checks
+    needs: [changes, checks]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checks Status
+        run: |
+          if [ "${{ needs.changes.outputs.important }}" = "true" ]; then
+            if [ "${{ needs.checks.result }}" != "success" ]; then
+              echo "Rust checks failed"
+              exit 1
+            fi
+          fi
+          echo "All checks passed or skipped"
