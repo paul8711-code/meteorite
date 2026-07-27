@@ -6,6 +6,7 @@
   - [ ] OAuth
   - [ ] Username
   - [ ] hook get_login_types up in UI
+  - [ ] make login screen not a state but a function
 - [x] Persistent session
 - [ ] Device verification (Emoji & QR)
 - [ ] Sending & receiving messages
