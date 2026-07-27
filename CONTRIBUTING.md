@@ -59,7 +59,7 @@ We value human-authored code where the contributor deeply understands the logic,
 
    Your branch name **must** start with one of the following types, followed by a slash and a short, hyphen-separated description of your work:
 
-   * **`feature/`**: For adding new features and capabilities (e.g. `feature/sso-login`).
+   * **`feat/`**: For adding new features and capabilities (e.g. `feat/sso-login`).
    * **`fix/`**: For fixing broken code or resolving panics (e.g. `fix/prevent-overflow`).
    * **`chore/`**: For maintenance, dependency updates or documentation tweaks (e.g. `chore/update-readme`).
 
