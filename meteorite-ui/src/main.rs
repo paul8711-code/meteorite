@@ -57,7 +57,7 @@ fn run() {
             app_id: Some(APP_NAME.to_owned()),
             icon: Some(Arc::new(
                 eframe::icon_data::from_png_bytes(include_bytes!(
-                    "../../assets/icon/icon-rounded.png"
+                    "../assets/icon/icon-rounded.png"
                 ))
                 .unwrap(),
             )),
@@ -81,7 +81,7 @@ fn run() {
     }
 }
 
-static ICON: &[u8] = include_bytes!("../../assets/icon/icon.png");
+static ICON: &[u8] = include_bytes!("../assets/icon/icon.png");
 
 struct App {
     current_state: Arc<Mutex<UiState>>,

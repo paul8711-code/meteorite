@@ -13,7 +13,7 @@ impl MainScreen {
                 // all icons have now been normed to 50 px
                 let home_button = ui.add(
                     egui::widgets::Button::image(
-                        egui::Image::new(egui::include_image!("../../../assets/home.png"))
+                        egui::Image::new(egui::include_image!("../../assets/home.png"))
                             .fit_to_exact_size(egui::Vec2 { x: 50.0, y: 50.0 }),
                     )
                     .corner_radius(20.0), // animate to 15.0
