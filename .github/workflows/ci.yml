@@ -70,6 +70,12 @@ jobs:
               echo "OPENSSL_SRC_PERL=C:/Strawberry/perl/bin/perl" | tee -a "$GITHUB_ENV"
               ;;
           esac
+          case "${{ matrix.os }}" in
+            *'ubuntu'*)
+              sudo apt-get update
+              sudo apt-get install -y pkg-config libglib2.0-dev
+              ;;
+          esac
           cargo update
 
       - name: Formatting Check
