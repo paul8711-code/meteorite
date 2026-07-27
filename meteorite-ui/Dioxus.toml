@@ -1,0 +1,4 @@
+[application]
+name = "meteorite"
+asset_dir = "assets"
+default_platform = "desktop"
