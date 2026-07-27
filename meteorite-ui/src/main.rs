@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use dioxus::prelude::*;
 use eframe::egui;
 use meteorite_core::Client;
 use meteorite_core::{APP_NAME, auth, init};
