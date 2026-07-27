@@ -10,6 +10,15 @@ All code must be formatted with `cargo fmt`.
 
 Your code must pass `cargo clippy` with zero warnings.
 
+### Branches
+
+Your branch name **must** start with one of the following types, followed by a slash and a short, hyphen-separated description of your work:
+
+* **`feat/`**: For adding new features and capabilities (e.g. `feat/sso-login`).
+* **`fix/`**: For fixing broken code or resolving panics (e.g. `fix/prevent-overflow`).
+* **`chore/`**: For maintenance, dependency updates or documentation tweaks (e.g. `chore/update-readme`).
+* **`refactor/`**: For restructuring existing code without changing how it works (e.g. `refactor/cleanup-user-auth`).
+
 ### Pull Requests
 
 To keep our Git history clean and maintainable, please ensure your Pull Request meets the following standards before submitting:
@@ -54,14 +63,6 @@ We value human-authored code where the contributor deeply understands the logic,
     ```bash
     git checkout -b type/your-branch-name
     ```
-
-   ### Naming convention
-
-   Your branch name **must** start with one of the following types, followed by a slash and a short, hyphen-separated description of your work:
-
-   * **`feat/`**: For adding new features and capabilities (e.g. `feat/sso-login`).
-   * **`fix/`**: For fixing broken code or resolving panics (e.g. `fix/prevent-overflow`).
-   * **`chore/`**: For maintenance, dependency updates or documentation tweaks (e.g. `chore/update-readme`).
 
 3. Check out [`TODO.md`](TODO.md) or search for comments in code starting with `TODO`
 
