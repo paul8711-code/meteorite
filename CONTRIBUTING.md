@@ -49,7 +49,11 @@ We value human-authored code where the contributor deeply understands the logic,
 ## How to Contribute
 
 1. **Fork or Clone** the repository.
-2. **Create a new branch** from `main`:
+2. Install required tools:
+
+    * [Dioxus CLI](https://dioxuslabs.com/learn/0.7/getting_started/#install-the-dioxus-cli) (especially for UI development)
+
+3. **Create a new branch** from `main`:
 
     ```bash
     git checkout -b type/your-branch-name
@@ -63,6 +67,6 @@ We value human-authored code where the contributor deeply understands the logic,
    * **`fix/`**: For fixing broken code or resolving panics (e.g. `fix/prevent-overflow`).
    * **`chore/`**: For maintenance, dependency updates or documentation tweaks (e.g. `chore/update-readme`).
 
-3. Check out [`TODO.md`](TODO.md) or search for comments in code starting with `TODO`
+4. Check out [`TODO.md`](TODO.md) or search for comments in code starting with `TODO`
 
 **Branches that do not follow our rules will not be merged.**
