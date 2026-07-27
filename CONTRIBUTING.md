@@ -49,9 +49,64 @@ We value human-authored code where the contributor deeply understands the logic,
 ## How to Contribute
 
 1. **Fork or Clone** the repository.
-2. Install required tools:
+2. Install required tools and prerequisites:
 
-    * [Dioxus CLI](https://dioxuslabs.com/learn/0.7/getting_started/#install-the-dioxus-cli) (especially for UI development)
+    * [Dioxus CLI](https://dioxuslabs.com/learn/0.6/getting_started/#install-the-dioxus-cli) (required for UI development and running the desktop app)
+
+    ### Prerequisites (Linux)
+
+    If you are developing on Linux, you must install native C/C++ build tools and WebKitGTK development headers before building the project.
+
+    #### Debian / Ubuntu / Linux Mint / Pop!_OS
+    ```bash
+    sudo apt-get update
+    sudo apt-get install -y \
+      build-essential \
+      pkg-config \
+      libglib2.0-dev \
+      libgtk-3-dev \
+      libjavascriptcoregtk-4.1-dev \
+      libsoup-3.0-dev \
+      libwebkit2gtk-4.1-dev \
+      libssl-dev
+    ```
+
+    #### Fedora / RHEL / AlmaLinux
+    ```bash
+    sudo dnf install -y \
+      @development-tools \
+      pkgconf-pkg-config \
+      glib2-devel \
+      gtk3-devel \
+      javascriptcoregtk4.1-devel \
+      libsoup3-devel \
+      webkit2gtk4.1-devel \
+      openssl-devel
+    ```
+
+    #### Arch Linux / Manjaro
+    ```bash
+    sudo pacman -S --needed \
+      base-devel \
+      gtk3 \
+      webkit2gtk-4.1 \
+      libsoup3 \
+      openssl
+    ```
+    > **Note:** On Arch Linux, development headers are bundled directly inside the main package releases.
+
+    #### openSUSE (Tumbleweed / Leap)
+    ```bash
+    sudo zypper install -y -t pattern devel_basis
+    sudo zypper install -y \
+      pkg-config \
+      glib2-devel \
+      gtk3-devel \
+      javascriptcoregtk-4_1-devel \
+      libsoup-3_0-devel \
+      webkit2gtk-4_1-devel \
+      libopenssl-devel
+    ```
 
 3. **Create a new branch** from `main`:
 
@@ -68,5 +123,11 @@ We value human-authored code where the contributor deeply understands the logic,
    * **`chore/`**: For maintenance, dependency updates or documentation tweaks (e.g. `chore/update-readme`).
 
 4. Check out [`TODO.md`](TODO.md) or search for comments in code starting with `TODO`
+
+5. **Build and Run the Project locally:**
+
+    ```bash
+    dx serve
+    ```
 
 **Branches that do not follow our rules will not be merged.**
