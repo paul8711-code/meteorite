@@ -2,7 +2,7 @@ name: Rust Checks
 
 on:
   workflow_dispatch:
-  
+
   push:
     branches:
       - main
@@ -32,16 +32,24 @@ jobs:
               - "**/Cargo.toml"
               - ".cargo/**"
               - "Cargo.*"
-              
+
   checks:
-    name: Checks
+    name: ${{ matrix.name }}
     needs: changes
-    if: ${{ needs.changes.outputs.important == 'true' }}
+    if: needs.changes.outputs.important == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        include:
+          - name: Checks (Linux)
+            os: ubuntu-latest
+
+          - name: Checks (macOS)
+            os: macos-latest
+
+          - name: Checks (Windows)
+            os: windows-latest
 
     steps:
       - name: Checkout
@@ -72,3 +80,18 @@ jobs:
 
       - name: Run Tests
         run: cargo test --all-features --workspace
+
+  required-checks:
+    name: Required Status Checks
+    needs: [changes, checks]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          if [ "${{ needs.changes.outputs.important }}" = "true" ]; then
+            if [ "${{ needs.checks.result }}" != "success" ]; then
+              echo "Rust checks failed"
+              exit 1
+            fi
+          fi
+          echo "Checks passed or skipped"
