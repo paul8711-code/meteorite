@@ -1,481 +1,294 @@
-use super::{Arc, Client, LoginStage, Mutex, UiState, auth, egui, widgets};
-use tokio::{sync::mpsc, task::JoinHandle};
+use super::{Client, LoginStage, UiState, auth, components};
+use dioxus::prelude::*;
 
-const BUTTON_SIZE: egui::Vec2 = egui::vec2(280.0, 40.0);
-const RADIUS: f32 = 10.0;
+#[component]
+pub fn LoginScreen(mut state: Signal<UiState>, mut client: Signal<Option<Client>>) -> Element {
+    let mut current_stage = use_signal(LoginStage::default);
+    let mut show_validation_errors = use_signal(|| false);
 
-#[derive(Default)]
-pub struct LoginScreen {
-    show_validation_errors: bool,
-    current_stage: LoginStage,
-    target_stage: LoginStage,
-    login_task: Option<LoginTask>,
-    sso_link: Option<String>,
-    login_error: Option<String>,
-    homeserver: String,
-    username: String,
-    password: String,
-    visible: bool,
-}
+    let homeserver = use_signal(String::new);
+    let username = use_signal(String::new);
+    let password = use_signal(String::new);
 
-struct LoginTask {
-    login_handle: JoinHandle<()>,
-    login_rx: mpsc::UnboundedReceiver<String>,
-    error_rx: mpsc::UnboundedReceiver<String>,
-    client_rx: mpsc::UnboundedReceiver<Client>,
-}
+    let mut login_error = use_signal(|| Option::<String>::None);
+    let mut sso_link = use_signal(|| Option::<String>::None);
+    let mut is_authenticating = use_signal(|| false);
+    let mut current_task = use_signal(|| Option::<dioxus_core::Task>::None);
 
-struct WindowAnimation {
-    height: f32,
-    opacity: f32,
-    content_opacity: f32,
-    ready: bool,
-}
+    let window_height = match current_stage() {
+        LoginStage::Homeserver => "h-[275px]",
+        LoginStage::Credentials => "h-[465px]",
+    };
 
-impl LoginScreen {
-    pub fn show(
-        &mut self,
-        ui: &mut egui::Ui,
-        state: &mut Arc<Mutex<UiState>>,
-        client: &mut Option<Client>,
-    ) {
-        widgets::bottom_info_bar(ui);
-
-        egui::CentralPanel::default().show(ui, |ui| {
-            widgets::draw_bg(ui);
-
-            self.login_loading(ui);
-
-            self.display_error(ui);
-
-            self.login_window(ui, state, client);
-        });
-        self.visible = true;
-    }
-
-    fn display_error(&self, ui: &mut egui::Ui) {
-        let screen_width = ui.ctx().viewport_rect().width();
-        let toast_width = (screen_width * 0.6).clamp(250.0, 600.0);
-
-        egui::Area::new("error_area".into())
-            .anchor(egui::Align2::CENTER_TOP, [0.0, 50.0])
-            .show(ui, |ui| {
-                let opacity = {
-                    let fade = ui.ctx().animate_bool_with_time(
-                        ui.make_persistent_id(("login_screen", "error", "fade")),
-                        self.login_error.is_some(),
-                        0.25,
-                    );
-                    if self.login_error.is_some() {
-                        fade
-                    } else {
-                        0.0
-                    }
-                };
-
-                ui.set_width(toast_width);
-
-                ui.set_opacity(opacity);
-
-                egui::Frame::window(&ui.global_style())
-                    .corner_radius(RADIUS)
-                    .fill(egui::Color32::from_rgb(255, 120, 120))
-                    .stroke(egui::Stroke::new(3.0, egui::Color32::from_rgb(255, 0, 0)))
-                    .show(ui, |ui| {
-                        if let Some(login_error) = &self.login_error {
-                            ui.label(
-                                egui::RichText::new(login_error)
-                                    .color(egui::Color32::from_rgb(20, 20, 20)),
-                            );
-                        }
-                    });
-            });
-    }
-
-    fn login_window(
-        &mut self,
-        ui: &mut egui::Ui,
-        state: &mut Arc<Mutex<UiState>>,
-        client: &mut Option<Client>,
-    ) {
-        ui.scope(|ui| {
-            let anim = self.window_animation(ui);
-
-            ui.set_opacity(anim.opacity);
-
-            egui::Area::new("login_area".into())
-                .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
-                .show(ui, |ui| {
-                    egui::Frame::window(&ui.global_style())
-                        .multiply_with_opacity(anim.opacity)
-                        .corner_radius(RADIUS + 5.0)
-                        .show(ui, |ui| {
-                            ui.set_min_width(300.0);
-                            ui.set_height(anim.height);
-
-                            ui.set_opacity(anim.content_opacity);
-
-                            if anim.ready && anim.content_opacity > 0.0 {
-                                match self.current_stage {
-                                    LoginStage::Homeserver => {
-                                        self.homeserver(ui);
-                                    }
-                                    LoginStage::Credentials => {
-                                        self.credentials(ui, state, client);
-                                    }
-                                }
-                            }
-                        });
-                });
-        });
-    }
-
-    fn homeserver(&mut self, ui: &mut egui::Ui) {
-        ui.vertical_centered(|ui| {
-            widgets::add_icon(ui, egui::Vec2::splat(64.0));
-        });
-
-        text_field(
-            ui,
-            "Homeserver",
-            &mut self.homeserver,
-            "https://",
-            false,
-            true,
-            self.show_validation_errors,
-        );
-
-        ui.separator();
-
-        ui.vertical_centered(|ui| {
-            if ui
-                .add(
-                    egui::Button::new("Check")
-                        .min_size(BUTTON_SIZE)
-                        .corner_radius(RADIUS),
-                )
-                .clicked()
-            {
-                if self.homeserver.is_empty() {
-                    self.show_validation_errors = true;
-                } else {
-                    self.show_validation_errors = false;
-                    self.target_stage = LoginStage::Credentials;
-                }
-            }
-        });
-    }
-
-    fn credentials(
-        &mut self,
-        ui: &mut egui::Ui,
-        state: &mut Arc<Mutex<UiState>>,
-        client: &mut Option<Client>,
-    ) {
-        ui.vertical_centered(|ui| {
-            widgets::add_icon(ui, egui::Vec2::splat(64.0));
-        });
-
-        let enabled = !self.login_started();
-
-        text_field(
-            ui,
-            "Username",
-            &mut self.username,
-            "",
-            false,
-            enabled,
-            self.show_validation_errors,
-        );
-
-        text_field(
-            ui,
-            "Password",
-            &mut self.password,
-            "",
-            true,
-            enabled,
-            self.show_validation_errors,
-        );
-
-        ui.separator();
-
-        ui.vertical_centered(|ui| {
-            if ui
-                .add_enabled(
-                    enabled,
-                    egui::Button::new("Login")
-                        .min_size(BUTTON_SIZE)
-                        .corner_radius(RADIUS),
-                )
-                .clicked()
-            {
-                if self.username.is_empty() || self.password.is_empty() {
-                    self.show_validation_errors = true;
-                } else {
-                    self.finish_login(state);
-                }
-            }
-
-            ui.label("or");
-
-            if enabled {
-                if ui
-                    .add(
-                        egui::Button::new("Login with Homeserver")
-                            .min_size(BUTTON_SIZE)
-                            .corner_radius(RADIUS),
-                    )
-                    .clicked()
-                {
-                    self.login_error = None;
-                    self.start_login_homeserver();
-                }
-            } else if ui
-                .add(
-                    egui::Button::new("Cancel")
-                        .min_size(BUTTON_SIZE)
-                        .corner_radius(RADIUS),
-                )
-                .clicked()
-            {
-                // must be some at this point
-                self.login_task.take().unwrap().login_handle.abort();
-                self.sso_link = None;
-            }
-
-            self.login_recv(state, client);
-
-            if ui
-                .add_enabled(
-                    enabled,
-                    egui::Button::new("Back")
-                        .min_size(BUTTON_SIZE)
-                        .corner_radius(RADIUS),
-                )
-                .clicked()
-            {
-                self.show_validation_errors = false;
-                self.target_stage = LoginStage::Homeserver;
-            }
-        });
-    }
-
-    fn start_login_homeserver(&mut self) {
-        let (login_tx, login_rx) = mpsc::unbounded_channel();
-        let (client_tx, client_rx) = mpsc::unbounded_channel();
-        let (error_tx, error_rx) = mpsc::unbounded_channel();
-
-        let homeserver_clone = self.homeserver.clone();
-
-        let login_handle = tokio::spawn(async move {
-            let login_result = auth::login_sso(&homeserver_clone, login_tx).await;
-
-            match login_result {
-                Ok(client) => {
-                    client_tx.send(client).ok();
-                }
-                Err(ref e) => {
-                    error_tx.send(e.to_string()).ok();
-                }
-            }
-        });
-        self.login_task = Some(LoginTask {
-            login_handle,
-            login_rx,
-            error_rx,
-            client_rx,
-        });
-    }
-
-    fn login_recv(&mut self, state: &mut Arc<Mutex<UiState>>, client: &mut Option<Client>) {
-        let mut error = None;
-        let mut client_recv = None;
-        let mut sso_link = None;
-
-        if let Some(task) = self.login_task.as_mut() {
-            error = task.error_rx.try_recv().ok();
-            client_recv = task.client_rx.try_recv().ok();
-            sso_link = task.login_rx.try_recv().ok();
+    let mut cancel_active_task = move || {
+        if let Some(task) = current_task.take() {
+            task.cancel();
         }
+    };
 
-        if let Some(error_msg) = error {
-            self.login_error = Some(error_msg);
-            self.login_task = None;
-        }
+    let cancel_login = move |_| {
+        cancel_active_task();
+        is_authenticating.set(false);
+        sso_link.set(None);
+    };
 
-        if let Some(recv_client) = client_recv {
-            *client = Some(recv_client);
-
-            self.finish_login(state);
-        }
-
-        self.sso_link = sso_link.or(self.sso_link.take());
-    }
-
-    fn login_loading(&self, ui: &mut egui::Ui) {
-        if !self.login_started() {
+    let start_sso_login = move |_| {
+        if is_authenticating() {
             return;
         }
 
-        let size = 50.0;
-        let screen_rect = ui.ctx().viewport_rect();
+        cancel_active_task();
 
-        let spinner_rect =
-            egui::Rect::from_center_size(screen_rect.center(), egui::Vec2::splat(size));
+        login_error.set(None);
+        is_authenticating.set(true);
 
-        egui::Area::new("loading_spinner".into())
-            .order(egui::Order::Foreground)
-            .fixed_pos(egui::Pos2::ZERO)
-            .show(ui.ctx(), |ui| {
-                ui.put(spinner_rect, egui::Spinner::new().size(size));
-            });
+        let hs = homeserver.read().clone();
 
-        egui::Area::new("sso_text".into())
-            .order(egui::Order::Foreground)
-            .anchor(egui::Align2::CENTER_TOP, egui::vec2(0.0, size * 1.2))
-            .show(ui.ctx(), |ui| {
-                let opacity = {
-                    ui.ctx().animate_bool_with_time(
-                        ui.make_persistent_id(("login_screen", "sso_text", "fade")),
-                        self.sso_link.is_some(),
-                        0.25,
-                    )
-                };
+        let task = spawn(async move {
+            let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 
-                ui.set_opacity(opacity);
+            let mut handle = tokio::spawn(auth::login_sso(hs, tx));
 
-                egui::Frame::window(&ui.global_style())
-                    .corner_radius(10.0)
-                    .fill(egui::Color32::from_rgb(27, 27, 27))
-                    .stroke(egui::Stroke::new(3.0, egui::Color32::from_rgb(60, 60, 60)))
-                    .show(ui, |ui| {
-                        ui.horizontal_centered(|ui| {
-                            if let Some(text) = &self.sso_link {
-                                ui.label(text);
+            loop {
+                tokio::select! {
+                    Some(link) = rx.recv() => {
+                        sso_link.set(Some(link));
+                    }
+                    res = &mut handle => {
+                        match res {
+                            Ok(Ok(c)) => {
+                                client.set(Some(c));
+                                state.set(UiState::Main);
                             }
-                        });
-                    });
-            });
-    }
-
-    fn window_animation(&mut self, ui: &mut egui::Ui) -> WindowAnimation {
-        let opacity = ui.ctx().animate_bool_with_time(
-            ui.make_persistent_id(("login_screen", "fade")),
-            self.visible,
-            0.25,
-        );
-
-        let target_height = match self.current_stage {
-            LoginStage::Homeserver => 200.0,
-            LoginStage::Credentials => 390.0,
-        };
-        let (height, content_opacity) = if self.current_stage == self.target_stage {
-            let height = ui.ctx().animate_value_with_time(
-                ui.make_persistent_id(("login_screen", "content", "height")),
-                target_height,
-                0.1,
-            );
-
-            let is_height_ready = (height - target_height).abs() < 1.0;
-
-            let fade_in_opacity = ui.ctx().animate_bool_with_time(
-                ui.make_persistent_id(("login_screen", "content", "fade")),
-                is_height_ready,
-                0.15,
-            );
-
-            let content_opacity = if is_height_ready && opacity >= 1.0 {
-                fade_in_opacity
-            } else if opacity < 1.0 {
-                opacity
-            } else {
-                0.0
-            };
-
-            (height, content_opacity)
-        } else {
-            let fade_out_opacity = ui.ctx().animate_bool_with_time(
-                ui.make_persistent_id(("login_screen", "content", "fade")),
-                false,
-                0.15,
-            );
-
-            if fade_out_opacity <= 0.001 {
-                self.current_stage = self.target_stage;
+                            Ok(Err(e)) => {
+                                login_error.set(Some(e.to_string()));
+                            }
+                            Err(_) => {
+                                login_error.set(Some("Authentication process aborted".into()));
+                            }
+                        }
+                        break;
+                    }
+                }
             }
 
-            let content_opacity = fade_out_opacity;
+            is_authenticating.set(false);
+        });
+        current_task.set(Some(task));
+    };
 
-            let height = ui.ctx().animate_value_with_time(
-                ui.make_persistent_id(("login_screen", "content", "height")),
-                target_height,
-                0.1,
-            );
-            (height, content_opacity)
-        };
-
-        let ready = (height - target_height).abs() < 1.0;
-
-        WindowAnimation {
-            height,
-            opacity,
-            content_opacity,
-            ready,
+    let submit_credentials = move |_| {
+        if username.read().is_empty() || password.read().is_empty() {
+            show_validation_errors.set(true);
+            return;
         }
-    }
 
-    fn finish_login(&mut self, state: &mut Arc<Mutex<UiState>>) {
-        *self = Self::default();
+        show_validation_errors.set(false);
+        is_authenticating.set(true);
+        login_error.set(None);
 
-        if let Ok(mut s) = state.lock() {
-            *s = UiState::Main;
+        let _hs = homeserver.read().clone();
+        let _user = username.read().clone();
+        let _pass = password.read().clone();
+
+        let task = spawn(async move {
+            // TODO: implement login_username logic
+            is_authenticating.set(false);
+        });
+
+        current_task.set(Some(task));
+    };
+
+    rsx! {
+        components::Bg {
+            div {
+                class: "relative, min-h-screen flex flex-col items-center justify-center p-4",
+                if let Some(err_msg) = login_error() {
+                    div {
+                        class: "absolute top-12 z-50 w-full max-w-md p-4 rounded-lg bg-red-200 border-2 border-red-500 text-gray-900 text-center shadow-lg transition-all duration-300 animate-fade-in",
+                        "{err_msg}"
+                    }
+                }
+
+                if is_authenticating() {
+                    div {
+                        class: "absolute inset-0 z-40 bg-black/40 flex flex-col items-center justify-center gap-4 backdrop-blur-sm",
+                        components::Spinner {
+                            size: "h-[50px] w-[50px]",
+                        }
+                        if let Some(link) = sso_link() {
+                            div {
+                                class: "p-3 bg-neutral-900 border border-neutral-700 rounded-lg text-white text-sm shadow-xl animate-fade-in",
+                                "{link}"
+                            }
+                        }
+                    }
+                }
+
+                div {
+                    class: "w-full max-w-[340px] bg-neutral-800 border border-neutral-700 rounded-xl p-4 shadow-2xl transition-all duration-300 ease-in-out overflow-hidden {window_height}",
+                    div {
+                        class: "flex flex-col items-center mb-4",
+                        components::Icon {
+                            size: "h-[64px] w-[64px]",
+                        }
+                    }
+
+                    div {
+                        class: "grid grid-cols-1 grid-rows-1",
+
+                        div {
+                            class: format_args!(
+                                "flex flex-col gap-3 col-start-1 row-start-1 transition-all duration-200 ease-in-out {}",
+                                if current_stage() == LoginStage::Homeserver {
+                                    "opacity-100 delay-200 visible"
+                                } else {
+                                    "opacity-0 delay-0 invisible pointer-events-none"
+                                }
+                            ),
+
+                            TextField {
+                                label: "Homeserver",
+                                prefix: "https://",
+                                value: homeserver,
+                                disabled: is_authenticating(),
+                                show_error: show_validation_errors() && homeserver.read().is_empty(),
+                            }
+
+                            hr {
+                                class: "border-neutral-700 my-2",
+                            }
+
+                            button {
+                                class: "w-full py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-medium transition-colors cursor-pointer",
+                                onclick: move |_| {
+                                    if homeserver.read().is_empty() {
+                                        show_validation_errors.set(true);
+                                    } else {
+                                        show_validation_errors.set(false);
+                                        current_stage.set(LoginStage::Credentials);
+                                    }
+                                },
+                                "Check"
+                            }
+                        }
+
+                        div {
+                            class: format_args!(
+                                "flex flex-col gap-3 col-start-1 row-start-1 transition-all duration-200 ease-in-out {}",
+                                if current_stage() == LoginStage::Credentials {
+                                    "opacity-100 delay-200 visible"
+                                } else {
+                                    "opacity-0 delay-0 invisible pointer-events-none"
+                                }
+                            ),
+
+                            TextField {
+                                label: "Username",
+                                prefix: "",
+                                value: username,
+                                disabled: is_authenticating(),
+                                show_error: show_validation_errors() && username.read().is_empty(),
+                            }
+                            TextField {
+                                label: "Password",
+                                prefix: "",
+                                value: password,
+                                is_password: true,
+                                disabled: is_authenticating(),
+                                show_error: show_validation_errors() && password.read().is_empty(),
+                            }
+
+                            hr {
+                                class: "border-neutral-700 my-1",
+                            }
+
+                            button {
+                                class: "w-full py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg text-white font-medium transition-colors cursor-pointer",
+                                disabled: is_authenticating(),
+                                onclick: submit_credentials,
+                                "Login"
+                            }
+                            div {
+                                class: "text-center text-xs text-neutral-400 font-semibold",
+                                "or"
+                            }
+                            if !is_authenticating() {
+                                button {
+                                    class: "w-full py-2 bg-neutral-700 hover:bg-neutral-600 rounded-lg text-white text-sm transition-colors cursor-pointer",
+                                    onclick: start_sso_login,
+                                    "Login with Homeserver"
+                                }
+                            } else {
+                                button {
+                                    class: "z-60 w-full py-2 bg-red-600 hover:bg-red-500 rounded-lg text-white text-sm transition-colors cursor-pointer",
+                                    onclick: cancel_login,
+                                    "Cancel"
+                                }
+                            }
+                            button {
+                                class: "w-full py-2 bg-transparent hover:bg-neutral-700/50 rounded-lg text-neutral-400 text-sm transition-colors cursor-pointer",
+                                disabled: is_authenticating(),
+                                onclick: move |_| {
+                                    show_validation_errors.set(false);
+                                    current_stage.set(LoginStage::Homeserver);
+                                },
+                                "Back"
+                            }
+                        }
+                    }
+                }
+                components::Footer {}
+            }
         }
-    }
-
-    fn login_started(&self) -> bool {
-        self.login_task.is_some()
     }
 }
 
-fn text_field(
-    ui: &mut egui::Ui,
-    label: &str,
-    value: &mut String,
-    prefix: &str,
-    password: bool,
-    enabled: bool,
-    show_validation_errors: bool,
-) {
-    ui.horizontal(|ui| {
-        ui.add_space(10.0);
-        ui.label(label);
-    });
-    ui.vertical_centered(|ui| {
-        ui.add_enabled(
-            enabled,
-            egui::TextEdit::singleline(value)
-                .password(password)
-                .prefix(prefix),
-        );
-    });
+#[component]
+fn TextField(
+    label: &'static str,
+    #[props(default = "")] prefix: &'static str,
+    mut value: Signal<String>,
+    #[props(default = false)] is_password: bool,
+    #[props(default = false)] disabled: bool,
+    #[props(default = false)] show_error: bool,
+) -> Element {
+    let input_type = if is_password { "password" } else { "text" };
 
-    validation_error(ui, show_validation_errors, value);
-}
+    rsx! {
+        div {
+            class: "flex flex-col gap-1 w-full",
 
-fn validation_error(ui: &mut egui::Ui, show_validation_errors: bool, value: &str) {
-    if !show_validation_errors || !value.is_empty() {
-        ui.add_space(9.0);
-    }
+            label {
+                class: "text-xs font-semibold text-neutral-300 px-1",
+                "{label}"
+            }
 
-    ui.horizontal(|ui| {
-        if show_validation_errors && value.is_empty() {
-            ui.add_space(10.0);
-            ui.label(
-                egui::RichText::new("This field is required")
-                    .color(egui::Color32::LIGHT_RED)
-                    .small(),
-            );
+            div {
+                class: "flex items-center w-full bg-neutral-900 border border-neutral-700 focus-within:border-blue-500 rounded-md transition-all disabled:opacity-50",
+
+                span {
+                    class: "pointer-events-none select-none pl-3 text-neutral-500 text-sm",
+                    "{prefix}"
+                }
+
+                input {
+                    r#type: "{input_type}",
+                    class: "w-full pl-1 pr-3 py-1.5 bg-transparent text-white text-sm outline-none",
+                    value: "{value}",
+                    disabled,
+                    oninput: move |e| value.set(e.value()),
+                }
+            }
+
+            if show_error {
+                span {
+                    class: "text-xs text-red-400 px-1 animate-fade-in",
+                    "This field is required"
+                }
+            } else {
+                div { class: "h-[15px]" }
+            }
         }
-    });
+    }
 }

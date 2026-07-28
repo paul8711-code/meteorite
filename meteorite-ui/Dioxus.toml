@@ -1,4 +1,14 @@
 [application]
 name = "meteorite"
-asset_dir = "assets"
-default_platform = "desktop"
+
+[bundle]
+identifier = "com.paul8711.meteorite"
+publisher = "Paul8711"
+
+icon = ["assets/icon/icon-rounded.png"]
+
+[android]
+package = "com.paul8711.meteorite"
+
+[iOS]
+bundle_id = "com.paul8711.meteorite"

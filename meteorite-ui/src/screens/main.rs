@@ -1,43 +1,54 @@
-use super::egui;
+use dioxus::prelude::*;
 
-#[derive(Default)]
-pub struct MainScreen;
+#[component]
+pub fn MainScreen() -> Element {
+    rsx! {
+        div {
+            class: "flex h-screen w-screen font-sans m-0 p-0",
+            div {
+                class: "w-[75px] min-w-[75px] flex flex-col items-center border-r border-neutral-600",
 
-impl MainScreen {
-    pub fn show(&self, ui: &mut egui::Ui) {
-        egui::Panel::left("room_list_panel")
-            .resizable(false)
-            .exact_size(75.0)
-            .show(ui, |ui| {
-                ui.add_space(5.0);
-                // all icons have now been normed to 50 px
-                let home_button = ui.add(
-                    egui::widgets::Button::image(
-                        egui::Image::new(egui::include_image!("../../assets/home.png"))
-                            .fit_to_exact_size(egui::Vec2 { x: 50.0, y: 50.0 }),
-                    )
-                    .corner_radius(20.0), // animate to 15.0
-                );
-                if home_button.clicked() {
-                    println!("home");
+                div {
+                    class: "h-[5px]",
                 }
 
-                ui.add(egui::Separator::default().horizontal());
-            });
-        egui::Panel::right("account_panel")
-            .resizable(false)
-            .exact_size(350.0)
-            .show(ui, |ui| {
-                if ui.button("settings").clicked() {
-                    println!("settings");
-                }
-            });
-        egui::CentralPanel::default().show(ui, |ui| {
-            ui.heading("meteorite");
+                button {
+                    onclick: move |_| println!("home"),
+                    class: "w-[50px] h-[50px] rounded-[20px] m-1 p-0 bg-none overflow-hidden border border-neutral-600",
 
-            if ui.button("test").clicked() {
-                println!("clicked button");
+                    img {
+                        src: asset!("/assets/home.png"),
+                        width: "50",
+                        height: "50",
+                        class: "block",
+                    }
+                }
+
+                hr {
+                    class: "w-[80%] mx-[10px] my-0 border-t border-neutral-600",
+                }
             }
-        });
+
+            div {
+                class: "grow shrink basis-0 p-4",
+                h1 {
+                    "meteorite"
+                }
+                button {
+                    class: "border border-neutral-600 rounded-xl p-1",
+                    onclick: move |_| println!("clicked button"),
+                    "test"
+                }
+            }
+
+            div {
+                class: "w-[350px] min-w-[350px] p-4 border-l border-neutral-600",
+                button {
+                    class: "border border-neutral-600 rounded-xl p-1",
+                    onclick: move |_| println!("settings"),
+                    "settings"
+                }
+            }
+        }
     }
 }

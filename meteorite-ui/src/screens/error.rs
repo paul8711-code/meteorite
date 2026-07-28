@@ -1,59 +1,54 @@
-use super::{Arc, ErrorKind, Mutex, UiState, egui, widgets};
+use super::{ErrorKind, UiState, components};
+use dioxus::prelude::*;
 
-#[derive(Default)]
-pub struct ErrorScreen;
+#[component]
+pub fn ErrorScreen(mut state: Signal<UiState>, kind: ErrorKind, message: String) -> Element {
+    use_effect(move || {
+        if kind == ErrorKind::NoAccountActive {
+            *state.write() = UiState::Login;
+        }
+    });
 
-impl ErrorScreen {
-    pub fn show(
-        ui: &mut egui::Ui,
-        state: &mut Arc<Mutex<UiState>>,
-        kind: &ErrorKind,
-        message: &str,
-    ) {
-        match kind {
-            ErrorKind::NoAccountActive => {
-                if let Ok(mut state) = state.lock() {
-                    *state = UiState::Login;
+    match kind {
+        ErrorKind::NoAccountActive => {
+            rsx! {}
+        }
+        ErrorKind::Other => {
+            rsx! {
+                DisplayError {
+                    message,
                 }
             }
-            ErrorKind::Other => Self::display_error(ui, message),
         }
     }
+}
 
-    fn display_error(ui: &mut egui::Ui, err: &str) {
-        widgets::bottom_info_bar(ui);
+#[component]
+fn DisplayError(message: String) -> Element {
+    rsx! {
+        components::Bg {
+            div {
+                div {
+                    class: "fixed top-[50px] left-1/2 -translate-x-1/2 z-50 flex flex-col items-center transition-opacity duration-300 ease-in-out opacity-100 animate-fade-in",
+                    div {
+                        class: "p-4 rounded-[10px] bg-[#ff7878] border-[3px] border-[#ff0000] text-[#141414] font-medium shadow-lg text-center",
+                        "{message}"
+                    }
 
-        egui::CentralPanel::default().show(ui, |ui| {
-            widgets::draw_bg(ui);
+                    div {
+                        class: "h-[50px]",
+                    }
 
-            egui::Area::new("error_area".into())
-                .anchor(egui::Align2::CENTER_TOP, [0.0, 50.0])
-                .show(ui, |ui| {
-                    let opacity = ui.ctx().animate_bool_with_time(
-                        ui.make_persistent_id(("error_screen", "fade")),
-                        true,
-                        0.25,
-                    );
-
-                    ui.set_opacity(opacity);
-
-                    ui.vertical_centered(|ui| {
-                        egui::Frame::window(&ui.global_style())
-                            .corner_radius(10.0)
-                            .fill(egui::Color32::from_rgb(255, 120, 120))
-                            .stroke(egui::Stroke::new(3.0, egui::Color32::from_rgb(255, 0, 0)))
-                            .show(ui, |ui| {
-                                ui.label(
-                                    egui::RichText::new(err)
-                                        .color(egui::Color32::from_rgb(20, 20, 20)),
-                                );
-                            });
-
-                        ui.add_space(50.0);
-
-                        widgets::add_icon(ui, egui::Vec2::splat(256.0));
-                    });
-                });
-        });
+                    div {
+                        class: "flex items-center justify-center",
+                        components::Icon {
+                            size: "w-[256px] h-[256px]",
+                        }
+                    }
+                    // TODO: possibly add retry button
+                }
+                components::Footer {}
+            }
+        }
     }
 }
