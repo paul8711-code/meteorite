@@ -6,10 +6,10 @@ use meteorite_core::{auth, base_path, init};
 use native_dialog::MessageLevel;
 
 mod components;
-mod screens;
 mod utils;
+mod views;
 
-use screens::{error, loading, login, main};
+use views::{error, loading, login, main};
 
 #[derive(PartialEq, Clone, Copy, Default)]
 enum LoginStage {
