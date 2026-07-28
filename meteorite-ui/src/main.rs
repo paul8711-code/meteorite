@@ -1,16 +1,15 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use eframe::egui;
+use dioxus::prelude::*;
 use meteorite_core::Client;
-use meteorite_core::{APP_NAME, auth, init};
+use meteorite_core::{auth, base_path, init};
 use native_dialog::MessageLevel;
-use std::sync::{Arc, Mutex};
 
-mod screens;
+mod components;
 mod utils;
-mod widgets;
+mod views;
 
-use screens::{error, loading, login, main};
+use views::{error, loading, login, main};
 
 #[derive(PartialEq, Clone, Copy, Default)]
 enum LoginStage {
@@ -19,6 +18,7 @@ enum LoginStage {
     Credentials,
 }
 
+// TODO: no states but instead functions for each state
 #[derive(PartialEq, Clone)]
 enum UiState {
     Loading,
@@ -27,11 +27,16 @@ enum UiState {
     Main,
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Copy)]
 enum ErrorKind {
     NoAccountActive,
     Other,
 }
+
+const ICON: Asset = asset!("/assets/icon/icon.png");
+
+const MAIN_CSS: Asset = asset!("/assets/styling/main.css");
+const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
 
 #[tokio::main]
 async fn main() {
@@ -48,95 +53,70 @@ async fn main() {
         return;
     }
     let _keyring_guard = meteorite_core::KeyringGuard;
-    run();
-}
 
-fn run() {
-    let native_options = eframe::NativeOptions {
-        viewport: egui::viewport::ViewportBuilder {
-            app_id: Some(APP_NAME.to_owned()),
-            icon: Some(Arc::new(
-                eframe::icon_data::from_png_bytes(include_bytes!(
-                    "../assets/icon/icon-rounded.png"
-                ))
-                .unwrap(),
-            )),
-            ..Default::default()
-        },
-        ..Default::default()
-    };
-    match eframe::run_native(
-        "meteorite",
-        native_options,
-        Box::new(|cc| Ok(Box::new(App::new(cc)))),
-    ) {
-        Ok(()) => {}
-        Err(e) => {
-            utils::show_dialog_window(
-                "Launch Error",
-                format!("The application failed to set up a graphics context.\n\nDetails: {e}"),
-                MessageLevel::Error,
-            );
-        }
+    // TODO: set icon
+    let mut builder = LaunchBuilder::new();
+
+    #[cfg(all(not(target_os = "android"), not(target_os = "ios")))]
+    {
+        use dioxus::desktop::{Config, WindowBuilder};
+        builder = builder.with_cfg(
+            Config::default()
+                .with_data_directory(base_path())
+                .with_menu(None)
+                .with_window(WindowBuilder::new().with_title("meteorite")),
+        );
     }
+
+    builder.launch(App);
 }
 
-static ICON: &[u8] = include_bytes!("../assets/icon/icon.png");
+#[component]
+fn App() -> Element {
+    let current_state = use_signal(|| UiState::Loading);
+    // TODO: switch to use_context_provider
+    let client = use_signal(|| None::<Client>);
 
-struct App {
-    current_state: Arc<Mutex<UiState>>,
-    login_screen: login::LoginScreen,
-    loading_screen: loading::LoadingScreen,
-    main_screen: main::MainScreen,
-    client: Option<Client>,
-}
-
-impl App {
-    fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        use FontFamily::{Monospace, Proportional};
-        use egui::{FontFamily, FontId, TextStyle};
-        use std::collections::BTreeMap;
-
-        let text_styles: BTreeMap<TextStyle, FontId> = [
-            (TextStyle::Heading, FontId::new(25.0, Proportional)),
-            (TextStyle::Body, FontId::new(20.0, Proportional)),
-            (TextStyle::Monospace, FontId::new(20.0, Monospace)),
-            (TextStyle::Button, FontId::new(20.0, Proportional)),
-            (TextStyle::Small, FontId::new(15.0, Proportional)),
-        ]
-        .into();
-        cc.egui_ctx
-            .all_styles_mut(move |style| style.text_styles = text_styles.clone());
-        egui_extras::install_image_loaders(&cc.egui_ctx);
-        Self {
-            current_state: Arc::new(Mutex::new(UiState::Loading)),
-            login_screen: login::LoginScreen::default(),
-            loading_screen: loading::LoadingScreen::default(),
-            main_screen: main::MainScreen,
-            client: None,
+    rsx! {
+        // TODO: adjust title based on what the user is doing, e.g. (3) meteorite - Matrix HQ
+        document::Title {
+            "meteorite"
         }
-    }
-}
+        document::Link {
+            rel: "stylesheet",
+            href: MAIN_CSS,
+        }
+        document::Link {
+            rel: "stylesheet",
+            href: TAILWIND_CSS,
+        }
 
-impl eframe::App for App {
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        let state = {
-            if let Ok(state) = self.current_state.lock() {
-                state.clone()
-            } else {
-                UiState::Loading // fallback
-            }
-        };
+        div {
+            class: "app-container font-sans text-base antialiased bg-neutral-900 text-white min-h-screen p-4",
 
-        match state {
-            UiState::Loading => self.loading_screen.show(ui, &mut self.current_state),
-            UiState::Error { kind, message } => {
-                error::ErrorScreen::show(ui, &mut self.current_state, &kind, &message);
+            match &*current_state.read() {
+                UiState::Loading => rsx! {
+                    loading::LoadingScreen {
+                        state: current_state,
+                    }
+                },
+                UiState::Error { kind, message } => rsx! {
+                    error::ErrorScreen {
+                        state: current_state,
+                        kind: *kind,
+                        message: message.clone(),
+                    }
+                },
+                UiState::Login => rsx! {
+                    login::LoginScreen {
+                        state: current_state,
+                        client,
+                    }
+                },
+                UiState::Main => rsx! {
+                    main::MainScreen {}
+                },
             }
-            UiState::Main => self.main_screen.show(ui),
-            UiState::Login => self
-                .login_screen
-                .show(ui, &mut self.current_state, &mut self.client),
         }
     }
 }
