@@ -16,7 +16,6 @@
 - [ ] Threads
 - [ ] Account managment
 - [ ] GUI
-  - [ ] rewrite using dioxus -> feat/ui-rewrite
 - [ ] GIF Search
 - [ ] Write documentation
 - [ ] Handle refreshing of access token
