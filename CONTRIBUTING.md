@@ -81,7 +81,8 @@ We value human-authored code where the contributor deeply understands the logic,
       libjavascriptcoregtk-4.1-dev \
       libsoup-3.0-dev \
       libwebkit2gtk-4.1-dev \
-      libssl-dev
+      libssl-dev \
+      libxdo-dev
     ```
 
    #### Fedora / RHEL / AlmaLinux
@@ -95,7 +96,8 @@ We value human-authored code where the contributor deeply understands the logic,
       javascriptcoregtk4.1-devel \
       libsoup3-devel \
       webkit2gtk4.1-devel \
-      openssl-devel
+      openssl-devel \
+      xdotool-devel
     ```
 
    #### Arch Linux / Manjaro
@@ -106,7 +108,8 @@ We value human-authored code where the contributor deeply understands the logic,
       gtk3 \
       webkit2gtk-4.1 \
       libsoup3 \
-      openssl
+      openssl \
+      xdotool
     ```
 
     > **Note:** On Arch Linux, development headers are bundled directly inside the main package releases.
@@ -122,7 +125,8 @@ We value human-authored code where the contributor deeply understands the logic,
       javascriptcoregtk-4_1-devel \
       libsoup-3_0-devel \
       webkit2gtk-4_1-devel \
-      libopenssl-devel
+      libopenssl-devel \
+      xdotool-devel
     ```
 
 3. **Create a new branch** from `main`:
@@ -131,6 +135,6 @@ We value human-authored code where the contributor deeply understands the logic,
     git checkout -b type/your-branch-name
     ```
 
-3. Check out [`TODO.md`](TODO.md) or search for comments in code starting with `TODO`
+4. Check out [`TODO.md`](TODO.md) or search for comments in code starting with `TODO`
 
 **Branches that do not follow our rules will not be merged.**
