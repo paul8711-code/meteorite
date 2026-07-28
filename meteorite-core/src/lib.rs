@@ -20,3 +20,8 @@ impl Drop for KeyringGuard {
         keyring_core::unset_default_store();
     }
 }
+
+#[must_use]
+pub fn base_path() -> PathBuf {
+    utils::unwrap_lock(&BASE_PATH)
+}
