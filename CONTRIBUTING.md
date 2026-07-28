@@ -6,6 +6,9 @@
 
 All code must be formatted with `cargo fmt`.
 
+**Under no circumstances should you use `dx fmt`.**
+> Note: `dx fmt` rewrites `rsx!` blocks and Rust code using non-standard rules that fail `cargo fmt` checks and break CI pipelines. Always stick to `cargo fmt`.
+
 ### Linting
 
 Your code must pass `cargo clippy` with zero warnings.
@@ -62,11 +65,12 @@ We value human-authored code where the contributor deeply understands the logic,
 
     * [Dioxus CLI](https://dioxuslabs.com/learn/0.6/getting_started/#install-the-dioxus-cli) (required for UI development and running the desktop app)
 
-    ### Prerequisites (Linux)
+   ### Prerequisites (Linux)
 
     If you are developing on Linux, you must install native C/C++ build tools and WebKitGTK development headers before building the project.
 
-    #### Debian / Ubuntu / Linux Mint / Pop!_OS
+   #### Debian / Ubuntu / Linux Mint / Pop!_OS
+
     ```bash
     sudo apt-get update
     sudo apt-get install -y \
@@ -80,7 +84,8 @@ We value human-authored code where the contributor deeply understands the logic,
       libssl-dev
     ```
 
-    #### Fedora / RHEL / AlmaLinux
+   #### Fedora / RHEL / AlmaLinux
+
     ```bash
     sudo dnf install -y \
       @development-tools \
@@ -93,7 +98,8 @@ We value human-authored code where the contributor deeply understands the logic,
       openssl-devel
     ```
 
-    #### Arch Linux / Manjaro
+   #### Arch Linux / Manjaro
+
     ```bash
     sudo pacman -S --needed \
       base-devel \
@@ -102,9 +108,11 @@ We value human-authored code where the contributor deeply understands the logic,
       libsoup3 \
       openssl
     ```
+
     > **Note:** On Arch Linux, development headers are bundled directly inside the main package releases.
 
-    #### openSUSE (Tumbleweed / Leap)
+   #### openSUSE (Tumbleweed / Leap)
+
     ```bash
     sudo zypper install -y -t pattern devel_basis
     sudo zypper install -y \
