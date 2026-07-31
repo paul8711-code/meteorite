@@ -25,6 +25,9 @@
   - Apple keyring store
     - [ ] meteorite-core/Cargo.toml:36: transition to protected in the future?
     - [ ] meteorite-core/src/init.rs:45: transition to protected in the future?
+  - Android keyring store
+    - [ ] meteorite-core/src/init.rs:50: add keyring store for android
+    - [ ] meteorite-core/Cargo.toml:39: add keyring store for android
   - Login
     - [ ] meteorite-core/src/auth.rs:218: split functions into helpers
     - [ ] meteorite-core/src/auth.rs:287: check if access token expired
