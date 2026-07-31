@@ -43,6 +43,8 @@ fn setup_keyring() -> anyhow::Result<()> {
     keyring_core::set_default_store(windows_native_keyring_store::Store::new()?);
     #[cfg(target_os = "macos")]
     // TODO: transition to protected in the future?
+    // possibly protected only on mobile and keychain on desktop.
+    // protected requires code-signed application (99$/year)
     keyring_core::set_default_store(apple_native_keyring_store::keychain::Store::new()?);
     Ok(())
 }
