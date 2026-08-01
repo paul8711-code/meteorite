@@ -1,4 +1,4 @@
-use super::{Client, ErrorKind, LoginStage, UiState, auth, components};
+use super::{CLIENT, ErrorKind, LoginStage, UiState, auth, components};
 
 pub mod error;
 pub mod loading;
