@@ -1,4 +1,4 @@
-use super::{ErrorKind, UiState, auth, components};
+use super::{CLIENT, ErrorKind, UiState, auth, components};
 use dioxus::prelude::*;
 
 #[component]
@@ -12,7 +12,10 @@ pub fn LoadingScreen(mut state: Signal<UiState>) -> Element {
         tokio::time::sleep(std::time::Duration::from_millis(250)).await;
 
         match login_result {
-            Ok(_client) => state.set(UiState::Main),
+            Ok(client) => {
+                *CLIENT.write() = Some(client);
+                state.set(UiState::Main)
+            }
             Err(e) => {
                 let kind = match e {
                     auth::LoginError::NoAccountActive => ErrorKind::NoAccountActive,
