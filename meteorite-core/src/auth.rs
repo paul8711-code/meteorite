@@ -534,7 +534,7 @@ fn remove_orphaned_accounts() {
         // filter out only the files except the users.toml file (so it doesnt get deleted)
         if path.is_file()
             && path != users_path
-            && let Some(name) = entry.file_name().to_str().map(str::to_owned)
+            && let Some(name) = path.file_prefix().unwrap().to_str().map(str::to_owned)
         {
             resources.push(AccountResource::File(name, path));
         }
