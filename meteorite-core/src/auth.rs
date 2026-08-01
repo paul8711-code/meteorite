@@ -482,7 +482,6 @@ fn matrix_session_from_account(
     }
 }
 
-// FIX: non corrupted accounts are incorrectly flagged and deleted
 fn remove_orphaned_accounts() {
     let account_path = utils::unwrap_lock(&ACCOUNT_PATH);
     let users_path = account_path.join("users.toml");
