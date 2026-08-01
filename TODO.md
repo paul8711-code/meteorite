@@ -36,7 +36,6 @@
     - [ ] meteorite-ui/src/views/error.rs:48: possibly add retry button
     - [ ] meteorite-ui/src/main.rs:21: no states but instead functions for each state
     - [ ] meteorite-ui/src/main.rs:57: set icon
-    - [ ] meteorite-ui/src/main.rs:77: switch to use_context_provider
     - [ ] meteorite-ui/src/main.rs:81: adjust title based on what the user is doing, e.g. (3) meteorite - Matrix HQ
 
 ... and more according to [this](https://spec.matrix.org/v1.19/client-server-api/#summary) (will be added to list later)
