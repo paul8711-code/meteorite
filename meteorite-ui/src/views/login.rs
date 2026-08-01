@@ -1,8 +1,8 @@
-use super::{Client, LoginStage, UiState, auth, components};
+use super::{CLIENT, LoginStage, UiState, auth, components};
 use dioxus::prelude::*;
 
 #[component]
-pub fn LoginScreen(mut state: Signal<UiState>, mut client: Signal<Option<Client>>) -> Element {
+pub fn LoginScreen(mut state: Signal<UiState>) -> Element {
     let mut current_stage = use_signal(LoginStage::default);
     let mut show_validation_errors = use_signal(|| false);
 
@@ -57,7 +57,7 @@ pub fn LoginScreen(mut state: Signal<UiState>, mut client: Signal<Option<Client>
                     res = &mut handle => {
                         match res {
                             Ok(Ok(c)) => {
-                                client.set(Some(c));
+                                *CLIENT.write() = Some(c);
                                 state.set(UiState::Main);
                             }
                             Ok(Err(e)) => {

@@ -38,6 +38,8 @@ const ICON: Asset = asset!("/assets/icon/icon.png");
 const MAIN_CSS: Asset = asset!("/assets/styling/main.css");
 const TAILWIND_CSS: Asset = asset!("/assets/tailwind.css");
 
+static CLIENT: GlobalSignal<Option<Client>> = Signal::global(|| None::<Client>);
+
 #[tokio::main]
 async fn main() {
     // all errors are handled within the setup function
@@ -74,8 +76,6 @@ async fn main() {
 #[component]
 fn App() -> Element {
     let current_state = use_signal(|| UiState::Loading);
-    // TODO: switch to use_context_provider
-    let client = use_signal(|| None::<Client>);
 
     rsx! {
         // TODO: adjust title based on what the user is doing, e.g. (3) meteorite - Matrix HQ
@@ -110,7 +110,6 @@ fn App() -> Element {
                 UiState::Login => rsx! {
                     login::LoginScreen {
                         state: current_state,
-                        client,
                     }
                 },
                 UiState::Main => rsx! {
