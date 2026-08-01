@@ -31,7 +31,6 @@
   - Login
     - [ ] meteorite-core/src/auth.rs:218: split functions into helpers
     - [ ] meteorite-core/src/auth.rs:287: check if access token expired
-    - [ ] meteorite-core/src/auth.rs:485: FIX: non corrupted accounts are incorrectly flagged and deleted
   - UI
     - [ ] meteorite-ui/src/views/login.rs:95: implement login_username logic
     - [ ] meteorite-ui/src/views/error.rs:48: possibly add retry button
