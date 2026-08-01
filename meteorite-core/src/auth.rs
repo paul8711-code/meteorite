@@ -226,80 +226,90 @@ pub async fn get_login_types(homeserver: &str) -> anyhow::Result<Vec<LoginChoice
 /// Returns the [`LoginError::NoAccountActive`] variant if no account or multiple accounts are
 /// currently active. On any other error, the [`LoginError::Other`] variant is returned.
 pub async fn login() -> Result<Client, LoginError> {
-    // first remove possible leftovers
-    remove_orphaned_accounts();
+    tokio::task::spawn_blocking(move || {
+        let runtime = tokio::runtime::Handle::current();
 
-    let account_path = utils::unwrap_lock(&ACCOUNT_PATH);
-    let users_path = account_path.join("users.toml");
+        runtime.block_on(async move {
+            // first remove possible leftovers
+            remove_orphaned_accounts();
 
-    if !users_path.exists() {
-        return Err(LoginError::NoAccountActive);
-    }
-    // first read unencrypted file with all users
-    let toml_account_data = fs::read_to_string(users_path).map_err(|e| anyhow::anyhow!(e))?;
-    let accounts: AccountList =
-        toml::from_str(&toml_account_data).map_err(|e| anyhow::anyhow!(e))?;
+            let account_path = utils::unwrap_lock(&ACCOUNT_PATH);
+            let users_path = account_path.join("users.toml");
 
-    // filter the accounts for only active accounts
-    let mut active_accounts = accounts.accounts.iter().filter(|a| a.active);
-    // if multiple, no account is active
-    let account_data = match (active_accounts.next(), active_accounts.next()) {
-        (Some(account), None) => Some(account),
-        _ => None,
-    }
-    .ok_or(LoginError::NoAccountActive)?;
+            if !users_path.exists() {
+                return Err(LoginError::NoAccountActive);
+            }
+            // first read unencrypted file with all users
+            let toml_account_data =
+                fs::read_to_string(users_path).map_err(|e| anyhow::anyhow!(e))?;
+            let accounts: AccountList =
+                toml::from_str(&toml_account_data).map_err(|e| anyhow::anyhow!(e))?;
 
-    // define the paths once
-    let encrypted_path = account_path.join(format!("{}.enc", account_data.id));
-    let sqlite_path = account_path.join(&account_data.id);
+            // filter the accounts for only active accounts
+            let mut active_accounts = accounts.accounts.iter().filter(|a| a.active);
+            // if multiple, no account is active
+            let account_data = match (active_accounts.next(), active_accounts.next()) {
+                (Some(account), None) => Some(account),
+                _ => None,
+            }
+            .ok_or(LoginError::NoAccountActive)?;
 
-    // retrieve encryption passphrase from keyring (used for file encryption and db encryption)
-    let encryption_passphrase_entry =
-        Entry::new(APP_NAME, &account_data.id).map_err(|e| anyhow::anyhow!(e))?;
-    let encryption_passphrase = encryption_passphrase_entry
-        .get_password()
-        .map_err(|e| anyhow::anyhow!(e))?;
+            // define the paths once
+            let encrypted_path = account_path.join(format!("{}.enc", account_data.id));
+            let sqlite_path = account_path.join(&account_data.id);
 
-    // load encrypted file contents
-    let data = fs::read(&encrypted_path).map_err(|e| anyhow::anyhow!(e))?;
+            // retrieve encryption passphrase from keyring (used for file encryption and db encryption)
+            let encryption_passphrase_entry =
+                Entry::new(APP_NAME, &account_data.id).map_err(|e| anyhow::anyhow!(e))?;
+            let encryption_passphrase = encryption_passphrase_entry
+                .get_password()
+                .map_err(|e| anyhow::anyhow!(e))?;
 
-    // get identity from passphrase
-    let identity = age::scrypt::Identity::new(SecretString::from(encryption_passphrase.as_str()));
+            // load encrypted file contents
+            let data = fs::read(&encrypted_path).map_err(|e| anyhow::anyhow!(e))?;
 
-    // actually decrypt the file contents
-    let decrypted_bytes = age::decrypt(&identity, &data).map_err(|e| anyhow::anyhow!(e))?;
+            // get identity from passphrase
+            let identity =
+                age::scrypt::Identity::new(SecretString::from(encryption_passphrase.as_str()));
 
-    // deserialize decrypted toml into stored account data
-    let decrypted_account_data: EncryptedAccountData =
-        toml::from_slice(&decrypted_bytes).map_err(|e| anyhow::anyhow!(e))?;
+            // actually decrypt the file contents
+            let decrypted_bytes = age::decrypt(&identity, &data).map_err(|e| anyhow::anyhow!(e))?;
 
-    // construct the client
-    let client = Client::builder()
-        .server_name_or_homeserver_url(account_data.user_id.server_name())
-        .sqlite_store(
-            sqlite_path,
-            Some(&encryption_passphrase), // same as for encrypted files
-        )
-        .build()
-        .await
-        .map_err(|e| anyhow::anyhow!(e))?;
+            // deserialize decrypted toml into stored account data
+            let decrypted_account_data: EncryptedAccountData =
+                toml::from_slice(&decrypted_bytes).map_err(|e| anyhow::anyhow!(e))?;
 
-    // TODO: check if access token expired
-    // if yes:
-    // -> refresh using refresh token
-    // -> save new token and expiration date
+            // construct the client
+            let client = Client::builder()
+                .server_name_or_homeserver_url(account_data.user_id.server_name())
+                .sqlite_store(
+                    sqlite_path,
+                    Some(&encryption_passphrase), // same as for encrypted files
+                )
+                .build()
+                .await
+                .map_err(|e| anyhow::anyhow!(e))?;
 
-    // restore session from the unified account struct
-    client
-        .matrix_auth()
-        .restore_session(
-            matrix_session_from_account(account_data, &decrypted_account_data),
-            RoomLoadSettings::default(),
-        )
-        .await
-        .map_err(|e| anyhow::anyhow!(e))?;
+            // TODO: check if access token expired
+            // if yes:
+            // -> refresh using refresh token
+            // -> save new token and expiration date
 
-    Ok(client)
+            // restore session from the unified account struct
+            client
+                .matrix_auth()
+                .restore_session(
+                    matrix_session_from_account(account_data, &decrypted_account_data),
+                    RoomLoadSettings::default(),
+                )
+                .await
+                .map_err(|e| anyhow::anyhow!(e))?;
+
+            Ok(client)
+        })
+    })
+    .await
+    .map_err(|e| LoginError::Other(e.into()))?
 }
 
 /// Tries to log a user in via their homeserver.
