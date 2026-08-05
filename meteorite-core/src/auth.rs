@@ -61,14 +61,14 @@ struct AccountData {
 // stored in encrypted file, passphrase stored in keyring
 // only loaded when required
 #[derive(Deserialize, Serialize)]
-struct EncryptedAccountData {
+struct SecureAccountData {
     access_token: String,
     refresh_token: Option<String>,
     expiration: Option<SystemTime>,
     device_id: OwnedDeviceId,
 }
 
-impl EncryptedAccountData {
+impl SecureAccountData {
     fn new(
         access_token: String,
         refresh_token: Option<String>,
@@ -294,7 +294,7 @@ pub async fn login() -> Result<Client, LoginError> {
             let decrypted_bytes = age::decrypt(&identity, &data).map_err(|e| anyhow::anyhow!(e))?;
 
             // deserialize decrypted toml into stored account data
-            let decrypted_account_data: EncryptedAccountData =
+            let decrypted_account_data: SecureAccountData =
                 toml::from_slice(&decrypted_bytes).map_err(|e| anyhow::anyhow!(e))?;
 
             // construct the client
@@ -397,7 +397,7 @@ pub async fn login_sso(
                 .map_err(|e| anyhow::anyhow!(e))?;
 
             // construct new encrypted account data from response
-            let account_data = EncryptedAccountData::new(
+            let account_data = SecureAccountData::new(
                 response.access_token,
                 response.refresh_token,
                 response.expires_in,
@@ -496,16 +496,16 @@ pub async fn login_sso(
 
 fn matrix_session_from_account(
     data: &AccountData,
-    encrypted: &EncryptedAccountData,
+    secure_data: &SecureAccountData,
 ) -> MatrixSession {
     MatrixSession {
         meta: SessionMeta {
             user_id: data.user_id.clone(),
-            device_id: encrypted.device_id.clone(),
+            device_id: secure_data.device_id.clone(),
         },
         tokens: SessionTokens {
-            access_token: encrypted.access_token.clone(),
-            refresh_token: encrypted.refresh_token.clone(),
+            access_token: secure_data.access_token.clone(),
+            refresh_token: secure_data.refresh_token.clone(),
         },
     }
 }
