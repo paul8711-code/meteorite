@@ -71,9 +71,11 @@ fn setup_keyring() -> anyhow::Result<()> {
 
 // sets some path variables and creates necessary folders
 fn setup_folders() -> anyhow::Result<()> {
-    let base_path = utils::local_data_dir(APP_NAME).ok_or(anyhow::anyhow!(
-        "The application was unable to find the data path",
-    ))?;
+    let base_path = sysdirs::data_local_dir()
+        .ok_or(anyhow::anyhow!(
+            "The application was unable to find the data path",
+        ))?
+        .join(APP_NAME);
     // set() can only return an error when it has already been set, which in this case cannot
     // happen.
     BASE_PATH.set(Mutex::new(base_path)).unwrap();
