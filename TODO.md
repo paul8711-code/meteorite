@@ -20,6 +20,7 @@
 - [ ] Write documentation
 - [ ] Handle refreshing of access token
 - [ ] Handle soft_logout
+- [ ] Add CI checks for mobile (iOS & Android)
 
 - TODOs in files:
   - Apple keyring store
