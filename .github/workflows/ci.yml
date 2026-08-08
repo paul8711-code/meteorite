@@ -95,9 +95,48 @@ jobs:
       - name: Run Tests
         run: cargo test --all-features --workspace
 
+  android:
+    name: Checks (Android)
+    needs: changes
+    if: needs.changes.outputs.important == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+          components: clippy, rustfmt
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2.9.1
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        run: sdkmanager "ndk;27.2.12479018"
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk
+
+      - name: Start Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_2
+          script: |
+            cargo ndk-test \
+              -t x86_64 \
+              -p meteorite-core
+
   required-checks:
     name: Required Status Checks
-    needs: [changes, checks]
+    needs: [changes, checks, android]
     if: always()
     runs-on: ubuntu-latest
     steps:
