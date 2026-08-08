@@ -52,7 +52,7 @@ jobs:
         run: cargo test --all-features --workspace
 
   macos:
-    name: Checks(macOS)
+    name: Checks (macOS)
     runs-on: macos-latest
     steps:
       - name: Checkout
