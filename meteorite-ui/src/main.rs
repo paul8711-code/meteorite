@@ -21,10 +21,8 @@
 use dioxus::prelude::*;
 use meteorite_core::Client;
 use meteorite_core::{auth, base_path, init};
-use native_dialog::MessageLevel;
 
 mod components;
-mod utils;
 mod views;
 
 use views::{error, loading, login, main};
@@ -40,15 +38,9 @@ enum LoginStage {
 #[derive(PartialEq, Clone)]
 enum UiState {
     Loading,
-    Error { kind: ErrorKind, message: String },
+    Error { message: String },
     Login,
     Main,
-}
-
-#[derive(PartialEq, Clone, Copy)]
-enum ErrorKind {
-    NoAccountActive,
-    Other,
 }
 
 const ICON: Asset = asset!("/assets/icon/icon.png");
@@ -60,22 +52,11 @@ static CLIENT: GlobalSignal<Option<Client>> = Signal::global(|| None::<Client>);
 
 #[tokio::main]
 async fn main() {
-    // all errors are handled within the setup function
-    if let Err(e) = init::setup() {
-        match e {
-            init::SetupError::Keyring(s) => {
-                utils::show_dialog_window("Keyring Error", s, MessageLevel::Error);
-            }
-            init::SetupError::Folder(s) => {
-                utils::show_dialog_window("Folder Error", s, MessageLevel::Error);
-            }
-        }
-        return;
-    }
+    let keyring_error = init::setup().err();
     let _keyring_guard = meteorite_core::KeyringGuard;
 
     // TODO: set icon
-    let mut builder = LaunchBuilder::new();
+    let mut builder = LaunchBuilder::new().with_context(keyring_error);
 
     #[cfg(all(not(target_os = "android"), not(target_os = "ios")))]
     {
@@ -93,7 +74,11 @@ async fn main() {
 
 #[component]
 fn App() -> Element {
-    let current_state = use_signal(|| UiState::Loading);
+    let mut current_state = use_signal(|| UiState::Loading);
+    let keyring_error = use_context::<Option<String>>();
+    if let Some(e) = keyring_error {
+        current_state.set(UiState::Error { message: e })
+    }
 
     rsx! {
         // TODO: adjust title based on what the user is doing, e.g. (3) meteorite - Matrix HQ
@@ -118,10 +103,9 @@ fn App() -> Element {
                         state: current_state,
                     }
                 },
-                UiState::Error { kind, message } => rsx! {
+                UiState::Error { message } => rsx! {
                     error::ErrorScreen {
                         state: current_state,
-                        kind: *kind,
                         message: message.clone(),
                     }
                 },
