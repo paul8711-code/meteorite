@@ -116,3 +116,21 @@ jobs:
 
       - name: Check
         run: cargo check --all-features --workspace --target aarch64-linux-android
+
+  ios:
+    name: Checks (iOS)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2.9.1
+
+      - name: Check
+        run: cargo check --all-features --workspace --target aarch64-apple-ios
