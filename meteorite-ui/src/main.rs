@@ -18,6 +18,7 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use dioxus::desktop::{Config, WindowBuilder};
 use dioxus::prelude::*;
 use meteorite_core::Client;
 use meteorite_core::{auth, base_path, init};
@@ -56,20 +57,15 @@ async fn main() {
     let _keyring_guard = meteorite_core::KeyringGuard;
 
     // TODO: set icon
-    let mut builder = LaunchBuilder::new().with_context(keyring_error);
-
-    #[cfg(all(not(target_os = "android"), not(target_os = "ios")))]
-    {
-        use dioxus::desktop::{Config, WindowBuilder};
-        builder = builder.with_cfg(
+    LaunchBuilder::new()
+        .with_context(keyring_error)
+        .with_cfg(desktop! {
             Config::default()
                 .with_data_directory(base_path())
                 .with_menu(None)
-                .with_window(WindowBuilder::new().with_title("meteorite")),
-        );
-    }
-
-    builder.launch(App);
+                .with_window(WindowBuilder::new().with_title("meteorite"))
+        })
+        .launch(App);
 }
 
 #[component]
