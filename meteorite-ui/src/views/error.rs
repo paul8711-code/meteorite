@@ -16,33 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::{ErrorKind, UiState, components};
+use super::{UiState, components};
 use dioxus::prelude::*;
 
 #[component]
-pub fn ErrorScreen(mut state: Signal<UiState>, kind: ErrorKind, message: String) -> Element {
-    use_effect(move || {
-        if kind == ErrorKind::NoAccountActive {
-            *state.write() = UiState::Login;
-        }
-    });
-
-    match kind {
-        ErrorKind::NoAccountActive => {
-            rsx! {}
-        }
-        ErrorKind::Other => {
-            rsx! {
-                DisplayError {
-                    message,
-                }
-            }
-        }
-    }
-}
-
-#[component]
-fn DisplayError(message: String) -> Element {
+pub fn ErrorScreen(mut state: Signal<UiState>, message: String) -> Element {
     rsx! {
         components::Bg {
             div {

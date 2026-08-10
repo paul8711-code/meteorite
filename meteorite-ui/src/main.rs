@@ -21,10 +21,8 @@
 use dioxus::prelude::*;
 use meteorite_core::Client;
 use meteorite_core::{auth, base_path, init};
-use native_dialog::MessageLevel;
 
 mod components;
-mod utils;
 mod views;
 
 use views::{error, loading, login, main};
@@ -40,15 +38,9 @@ enum LoginStage {
 #[derive(PartialEq, Clone)]
 enum UiState {
     Loading,
-    Error { kind: ErrorKind, message: String },
+    Error { message: String },
     Login,
     Main,
-}
-
-#[derive(PartialEq, Clone, Copy)]
-enum ErrorKind {
-    NoAccountActive,
-    Other,
 }
 
 const ICON: Asset = asset!("/assets/icon/icon.png");
@@ -111,10 +103,9 @@ fn App() -> Element {
                         state: current_state,
                     }
                 },
-                UiState::Error { kind, message } => rsx! {
+                UiState::Error { message } => rsx! {
                     error::ErrorScreen {
                         state: current_state,
-                        kind: *kind,
                         message: message.clone(),
                     }
                 },

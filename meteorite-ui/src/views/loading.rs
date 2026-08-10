@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::{CLIENT, ErrorKind, UiState, auth, components};
+use super::{CLIENT, UiState, auth, components};
 use dioxus::prelude::*;
 
 #[component]
@@ -34,17 +34,12 @@ pub fn LoadingScreen(mut state: Signal<UiState>) -> Element {
                 *CLIENT.write() = Some(client);
                 state.set(UiState::Main)
             }
-            Err(e) => {
-                let kind = match e {
-                    auth::LoginError::NoAccountActive => ErrorKind::NoAccountActive,
-                    auth::LoginError::Other(_) => ErrorKind::Other,
-                };
-
-                state.set(UiState::Error {
-                    kind,
+            Err(e) => match e {
+                auth::LoginError::NoAccountActive => state.set(UiState::Login),
+                auth::LoginError::Other(_) => state.set(UiState::Error {
                     message: e.to_string(),
-                });
-            }
+                }),
+            },
         }
     });
 
