@@ -20,7 +20,6 @@
 - [ ] Write documentation
 - [ ] Handle refreshing of access token
 - [ ] Handle soft_logout
-- [ ] Remove `ErrorKind` struct (Redirect to correct screen in loading screen instead)
 
 - TODOs in files:
   - Apple keyring store
