@@ -62,14 +62,7 @@ static CLIENT: GlobalSignal<Option<Client>> = Signal::global(|| None::<Client>);
 async fn main() {
     // all errors are handled within the setup function
     if let Err(e) = init::setup() {
-        match e {
-            init::SetupError::Keyring(s) => {
-                utils::show_dialog_window("Keyring Error", s, MessageLevel::Error);
-            }
-            init::SetupError::Folder(s) => {
-                utils::show_dialog_window("Folder Error", s, MessageLevel::Error);
-            }
-        }
+        utils::show_dialog_window("Keyring Error", e, MessageLevel::Error);
         return;
     }
     let _keyring_guard = meteorite_core::KeyringGuard;
