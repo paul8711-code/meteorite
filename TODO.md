@@ -20,7 +20,6 @@
 - [ ] Write documentation
 - [ ] Handle refreshing of access token
 - [ ] Handle soft_logout
-- [ ] Add CI checks for mobile (iOS & Android)
 - [ ] Remove `ErrorKind` struct (Redirect to correct screen in loading screen instead)
 
 - TODOs in files:
