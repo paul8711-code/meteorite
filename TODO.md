@@ -22,9 +22,6 @@
 - [ ] Handle soft_logout
 
 - TODOs in files:
-  - Apple keyring store
-    - [ ] meteorite-core/Cargo.toml: transition to protected in the future?
-    - [ ] meteorite-core/src/init.rs: transition to protected in the future?
   - Android keyring store
     - [ ] meteorite-core/src/init.rs: add keyring store for android
     - [ ] meteorite-core/Cargo.toml: add keyring store for android
