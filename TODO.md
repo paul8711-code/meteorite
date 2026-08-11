@@ -20,6 +20,7 @@
 - [ ] Write documentation
 - [ ] Handle refreshing of access token
 - [ ] Handle soft_logout
+- [ ] Code-sign application for Apple (IMPORTANT) and Windows
 
 - TODOs in files:
   - Android keyring store
