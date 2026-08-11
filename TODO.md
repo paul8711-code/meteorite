@@ -24,7 +24,6 @@
 
 - TODOs in files:
   - Login
-    - [ ] meteorite-core/src/auth.rs: split functions into helpers
     - [ ] meteorite-core/src/auth.rs: check if access token expired
   - UI
     - [ ] meteorite-ui/src/views/login.rs: implement login_username logic

@@ -32,7 +32,7 @@ use matrix_sdk::{
 use rand::distr::{Alphanumeric, SampleString};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::{fs, path::PathBuf};
+use std::{fs, path::Path, path::PathBuf};
 use tokio::sync::mpsc;
 
 // This file contains all functions for authenticating a user. That includes loading necessary
@@ -233,8 +233,6 @@ pub async fn get_login_types(homeserver: &str) -> anyhow::Result<Vec<LoginChoice
     Ok(types)
 }
 
-// TODO: split functions into helpers
-
 /// Tries to log the user into the currently active account.
 ///
 /// Also reads the files necessary to login the user (users.toml, encrypted files, keyring entry).
@@ -254,48 +252,18 @@ pub async fn login() -> Result<Client, LoginError> {
             let account_path = utils::unwrap_lock(&ACCOUNT_PATH);
             let users_path = account_path.join("users.toml");
 
-            if !users_path.exists() {
-                return Err(LoginError::NoAccountActive);
-            }
-            // first read unencrypted file with all users
-            let toml_account_data =
-                fs::read_to_string(users_path).map_err(|e| anyhow::anyhow!(e))?;
-            let accounts: AccountList =
-                toml::from_str(&toml_account_data).map_err(|e| anyhow::anyhow!(e))?;
-
-            // filter the accounts for only active accounts
-            let mut active_accounts = accounts.accounts.iter().filter(|a| a.active);
-            // if multiple, no account is active
-            let account_data = match (active_accounts.next(), active_accounts.next()) {
-                (Some(account), None) => Some(account),
-                _ => None,
-            }
-            .ok_or(LoginError::NoAccountActive)?;
+            let accounts = load_account_list(&users_path)?;
+            let account_data = active_account(&accounts.accounts)?;
 
             // define the paths once
-            let encrypted_path = account_path.join(format!("{}.enc", account_data.id));
+            let secure_path = account_path.join(format!("{}.enc", account_data.id));
             let sqlite_path = account_path.join(&account_data.id);
 
-            // retrieve encryption passphrase from keyring (used for file encryption and db encryption)
-            let encryption_passphrase_entry =
-                Entry::new(APP_NAME, &account_data.id).map_err(|e| anyhow::anyhow!(e))?;
-            let encryption_passphrase = encryption_passphrase_entry
-                .get_password()
-                .map_err(|e| anyhow::anyhow!(e))?;
+            let encryption_passphrase =
+                load_encryption_passphrase(&account_data.id).map_err(|e| anyhow::anyhow!(e))?;
 
-            // load encrypted file contents
-            let data = fs::read(&encrypted_path).map_err(|e| anyhow::anyhow!(e))?;
-
-            // get identity from passphrase
-            let identity =
-                age::scrypt::Identity::new(SecretString::from(encryption_passphrase.as_str()));
-
-            // actually decrypt the file contents
-            let decrypted_bytes = age::decrypt(&identity, &data).map_err(|e| anyhow::anyhow!(e))?;
-
-            // deserialize decrypted toml into stored account data
-            let decrypted_account_data: SecureAccountData =
-                toml::from_slice(&decrypted_bytes).map_err(|e| anyhow::anyhow!(e))?;
+            let secure_account_data =
+                load_secure_account_data(&secure_path, &encryption_passphrase)?;
 
             // construct the client
             let client = Client::builder()
@@ -317,7 +285,7 @@ pub async fn login() -> Result<Client, LoginError> {
             client
                 .matrix_auth()
                 .restore_session(
-                    matrix_session_from_account(account_data, &decrypted_account_data),
+                    matrix_session_from_account(account_data, &secure_account_data),
                     RoomLoadSettings::default(),
                 )
                 .await
@@ -349,24 +317,11 @@ pub async fn login_sso(
             remove_orphaned_accounts();
 
             // initialize rng for later usage
-            let (id, encryption_passphrase) = {
-                let mut rng = rand::rng();
-                // generate id for usage on sqlite store and other files
-                let id = Alphanumeric.sample_string(&mut rng, 32);
-                // generate passphrase for sqlite store and encrypted files
-                let encryption_passphrase = Alphanumeric.sample_string(&mut rng, 32);
-                (id, encryption_passphrase)
-            };
+            let (id, encryption_passphrase) = generate_account_credentials();
 
             // define the paths once
             let account_path = utils::unwrap_lock(&ACCOUNT_PATH);
 
-            let backup_tmp_path = account_path.join("users.toml.backup.tmp");
-            let backup_path = account_path.join("users.toml.backup");
-            let users_tmp_path = account_path.join("users.toml.tmp");
-            let users_path = account_path.join("users.toml");
-            let encrypted_tmp_path = account_path.join(format!("{id}.enc.tmp"));
-            let encrypted_path = account_path.join(format!("{id}.enc"));
             let sqlite_path = account_path.join(&id);
 
             fs::create_dir_all(&account_path).map_err(|e| anyhow::anyhow!(e))?;
@@ -396,118 +351,20 @@ pub async fn login_sso(
                 .await
                 .map_err(|e| anyhow::anyhow!(e))?;
 
-            // construct new encrypted account data from response
-            let account_data = SecureAccountData::new(
+            // construct new secure account data from response
+            let secure_data = SecureAccountData::new(
                 response.access_token,
                 response.refresh_token,
                 response.expires_in,
                 response.device_id,
             );
 
-            // account_data struct -> toml
-            let serialized = toml::to_string(&account_data).map_err(|e| anyhow::anyhow!(e))?;
-
-            // get recipient from passphrase
-            let recipient =
-                age::scrypt::Recipient::new(SecretString::from(encryption_passphrase.as_str()));
-
-            // encrypt account data
-            let encrypted_bytes =
-                age::encrypt(&recipient, serialized.as_bytes()).map_err(|e| anyhow::anyhow!(e))?;
-
-            let encryption_passphrase_entry =
-                Entry::new(APP_NAME, &id).map_err(|e| anyhow::anyhow!(e))?;
-
-            // create guard as soon as possible
-            let mut guard = AccountCreationGuard {
-                backup_path: backup_path.clone(),
-                backup_tmp_path: backup_tmp_path.clone(),
-                backup_created: false,
-
-                users_path: users_path.clone(),
-
-                sqlite_path: sqlite_path.clone(),
-                encrypted_path: encrypted_path.clone(),
-
-                users_tmp_path: users_tmp_path.clone(),
-                encrypted_tmp_path: encrypted_tmp_path.clone(),
-
-                keyring_entry: encryption_passphrase_entry,
-                keyring_created: false,
-
-                committed: false,
-            };
-
-            // read unencrypted file with all users
-            let mut accounts: AccountList = if users_path.exists() {
-                let toml_account_data =
-                    fs::read_to_string(&users_path).map_err(|e| anyhow::anyhow!(e))?;
-                toml::from_str(&toml_account_data).map_err(|e| anyhow::anyhow!(e))?
-            } else {
-                AccountList::default()
-            };
-
-            // create backup of accounts
-            let toml_account_data = toml::to_string(&accounts).map_err(|e| anyhow::anyhow!(e))?;
-            fs::write(&backup_tmp_path, &toml_account_data).map_err(|e| anyhow::anyhow!(e))?;
-            fs::rename(&backup_tmp_path, &backup_path).map_err(|e| anyhow::anyhow!(e))?;
-
-            guard.backup_created = true;
-
-            // set all accounts active to false (for the new account to be active)
-            accounts.accounts.iter_mut().for_each(|a| a.active = false);
-
-            // add new account to vector
-            accounts.accounts.push(AccountData {
-                id,
-                user_id: response.user_id,
-                active: true,
-            });
-
-            let toml_account_data = toml::to_string(&accounts).map_err(|e| anyhow::anyhow!(e))?;
-
-            // write bytes to encrypted file
-            fs::write(&encrypted_tmp_path, &encrypted_bytes).map_err(|e| anyhow::anyhow!(e))?;
-
-            fs::rename(&encrypted_tmp_path, &encrypted_path).map_err(|e| anyhow::anyhow!(e))?;
-
-            // write unencrypted file
-            fs::write(&users_tmp_path, toml_account_data).map_err(|e| anyhow::anyhow!(e))?;
-
-            fs::rename(&users_tmp_path, &users_path).map_err(|e| anyhow::anyhow!(e))?;
-
-            // save encryption passphrase to keyring (used for file encryption and db encryption)
-            guard
-                .keyring_entry
-                .set_password(&encryption_passphrase)
-                .map_err(|e| anyhow::anyhow!(e))?;
-
-            guard.keyring_created = true;
-
-            let _ = fs::remove_file(&backup_path);
-
-            guard.commit();
+            save_account(&id, response.user_id, &secure_data, &encryption_passphrase)?;
 
             Ok(client)
         })
     })
     .await?
-}
-
-fn matrix_session_from_account(
-    data: &AccountData,
-    secure_data: &SecureAccountData,
-) -> MatrixSession {
-    MatrixSession {
-        meta: SessionMeta {
-            user_id: data.user_id.clone(),
-            device_id: secure_data.device_id.clone(),
-        },
-        tokens: SessionTokens {
-            access_token: secure_data.access_token.clone(),
-            refresh_token: secure_data.refresh_token.clone(),
-        },
-    }
 }
 
 fn remove_orphaned_accounts() {
@@ -635,6 +492,171 @@ fn remove_orphaned_accounts() {
     };
 
     fs::write(&users_path, toml_account_data).ok();
+}
+
+fn load_account_list(path: &Path) -> anyhow::Result<AccountList> {
+    if !path.exists() {
+        return Ok(AccountList::default());
+    }
+
+    let toml_account_data = fs::read_to_string(path).map_err(|e| anyhow::anyhow!(e))?;
+    toml::from_str(&toml_account_data).map_err(|e| anyhow::anyhow!(e))
+}
+
+fn load_secure_account_data(
+    path: &Path,
+    encryption_passphrase: &str,
+) -> anyhow::Result<SecureAccountData> {
+    // load encrypted file contents
+    let data = fs::read(path).map_err(|e| anyhow::anyhow!(e))?;
+
+    // get identity from passphrase
+    let identity = age::scrypt::Identity::new(SecretString::from(encryption_passphrase));
+    let decrypted_bytes = age::decrypt(&identity, &data).map_err(|e| anyhow::anyhow!(e))?;
+    toml::from_slice(&decrypted_bytes).map_err(|e| anyhow::anyhow!(e))
+}
+
+fn active_account(accounts: &[AccountData]) -> Result<&AccountData, LoginError> {
+    // filter the accounts for only active accounts
+    let mut active_accounts = accounts.iter().filter(|a| a.active);
+    // if multiple, no account is active
+    match (active_accounts.next(), active_accounts.next()) {
+        (Some(account), None) => Some(account),
+        _ => None,
+    }
+    .ok_or(LoginError::NoAccountActive)
+}
+
+fn load_encryption_passphrase(id: &str) -> Result<String, keyring_core::Error> {
+    // retrieve encryption passphrase from keyring (used for file encryption and db encryption)
+    let encryption_passphrase_entry = Entry::new(APP_NAME, id)?;
+    encryption_passphrase_entry.get_password()
+}
+
+fn generate_account_credentials() -> (String, String) {
+    let mut rng = rand::rng();
+    // generate id for usage on sqlite store and other files
+    let id = Alphanumeric.sample_string(&mut rng, 32);
+    // generate passphrase for sqlite store and encrypted files
+    let encryption_passphrase = Alphanumeric.sample_string(&mut rng, 32);
+    (id, encryption_passphrase)
+}
+
+fn save_account(
+    id: &str,
+    user_id: OwnedUserId,
+    secure_data: &SecureAccountData,
+
+    encryption_passphrase: &str,
+) -> anyhow::Result<()> {
+    let account_path = utils::unwrap_lock(&ACCOUNT_PATH);
+
+    let backup_tmp_path = account_path.join("users.toml.backup.tmp");
+    let backup_path = account_path.join("users.toml.backup");
+    let users_tmp_path = account_path.join("users.toml.tmp");
+    let users_path = account_path.join("users.toml");
+    let encrypted_tmp_path = account_path.join(format!("{id}.enc.tmp"));
+    let encrypted_path = account_path.join(format!("{id}.enc"));
+    let sqlite_path = account_path.join(id);
+
+    // secure_data struct -> toml
+    let serialized = toml::to_string(secure_data).map_err(|e| anyhow::anyhow!(e))?;
+
+    // get recipient from passphrase
+    let recipient = age::scrypt::Recipient::new(SecretString::from(encryption_passphrase));
+
+    // encrypt secure data
+    let encrypted_bytes =
+        age::encrypt(&recipient, serialized.as_bytes()).map_err(|e| anyhow::anyhow!(e))?;
+
+    let encryption_passphrase_entry = Entry::new(APP_NAME, id).map_err(|e| anyhow::anyhow!(e))?;
+
+    // create guard as soon as possible
+    let mut guard = AccountCreationGuard {
+        backup_path: backup_path.clone(),
+        backup_tmp_path: backup_tmp_path.clone(),
+        backup_created: false,
+
+        users_path: users_path.clone(),
+
+        sqlite_path: sqlite_path.clone(),
+        encrypted_path: encrypted_path.clone(),
+
+        users_tmp_path: users_tmp_path.clone(),
+        encrypted_tmp_path: encrypted_tmp_path.clone(),
+
+        keyring_entry: encryption_passphrase_entry,
+        keyring_created: false,
+
+        committed: false,
+    };
+
+    // read unencrypted file with all users
+    let mut accounts: AccountList = if users_path.exists() {
+        let toml_account_data = fs::read_to_string(&users_path).map_err(|e| anyhow::anyhow!(e))?;
+        toml::from_str(&toml_account_data).map_err(|e| anyhow::anyhow!(e))?
+    } else {
+        AccountList::default()
+    };
+
+    // create backup of accounts
+    let toml_account_data = toml::to_string(&accounts).map_err(|e| anyhow::anyhow!(e))?;
+    fs::write(&backup_tmp_path, &toml_account_data).map_err(|e| anyhow::anyhow!(e))?;
+    fs::rename(&backup_tmp_path, &backup_path).map_err(|e| anyhow::anyhow!(e))?;
+
+    guard.backup_created = true;
+
+    // set all accounts active to false (for the new account to be active)
+    accounts.accounts.iter_mut().for_each(|a| a.active = false);
+
+    // add new account to vector
+    accounts.accounts.push(AccountData {
+        id: id.to_string(),
+        user_id,
+        active: true,
+    });
+
+    let toml_account_data = toml::to_string(&accounts).map_err(|e| anyhow::anyhow!(e))?;
+
+    // write bytes to encrypted file
+    fs::write(&encrypted_tmp_path, &encrypted_bytes).map_err(|e| anyhow::anyhow!(e))?;
+
+    fs::rename(&encrypted_tmp_path, &encrypted_path).map_err(|e| anyhow::anyhow!(e))?;
+
+    // write unencrypted file
+    fs::write(&users_tmp_path, toml_account_data).map_err(|e| anyhow::anyhow!(e))?;
+
+    fs::rename(&users_tmp_path, &users_path).map_err(|e| anyhow::anyhow!(e))?;
+
+    // save encryption passphrase to keyring (used for file encryption and db encryption)
+    guard
+        .keyring_entry
+        .set_password(encryption_passphrase)
+        .map_err(|e| anyhow::anyhow!(e))?;
+
+    guard.keyring_created = true;
+
+    let _ = fs::remove_file(&backup_path);
+
+    guard.commit();
+
+    Ok(())
+}
+
+fn matrix_session_from_account(
+    data: &AccountData,
+    secure_data: &SecureAccountData,
+) -> MatrixSession {
+    MatrixSession {
+        meta: SessionMeta {
+            user_id: data.user_id.clone(),
+            device_id: secure_data.device_id.clone(),
+        },
+        tokens: SessionTokens {
+            access_token: secure_data.access_token.clone(),
+            refresh_token: secure_data.refresh_token.clone(),
+        },
+    }
 }
 
 /*
