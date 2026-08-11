@@ -7,7 +7,6 @@
   - [ ] Username
   - [ ] hook get_login_types up in UI
   - [ ] make login screen not a state but a function
-- [x] Persistent session
 - [ ] Device verification (Emoji & QR)
 - [ ] Sending & receiving messages
 - [ ] Multi-Account
@@ -21,6 +20,7 @@
 - [ ] Handle refreshing of access token
 - [ ] Handle soft_logout
 - [ ] Code-sign application for Apple (IMPORTANT) and Windows
+- [ ] Translations (weblate)
 
 - TODOs in files:
   - Login
