@@ -32,8 +32,9 @@ zbus-secret-service-keyring-store = { version = "1.0.0", features = [
     "crypto-rust",
 ] }
 
-[target.'cfg(target_os = "macos")'.dependencies]
+[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 # TODO: transition to protected in the future?
 apple-native-keyring-store = { version = "1.0.0", features = ["keychain"] }
 
-# TODO: add keyring store for android
+[target.'cfg(target_os = "android")'.dependencies]
+android-native-keyring-store = "1.0.0"
