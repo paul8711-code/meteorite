@@ -48,8 +48,7 @@ fn setup_keyring() -> Result<(), keyring_core::Error> {
     keyring_core::set_default_store(windows_native_keyring_store::Store::new().unwrap());
     #[cfg(target_os = "macos")]
     // TODO: transition to protected in the future?
-    // possibly protected only on mobile and keychain on desktop.
-    // protected requires code-signed application (99$/year)
+    // protected requires code-signed application (which we should do anyways, possibly just use self-signed one to avoid paying)
     keyring_core::set_default_store(apple_native_keyring_store::keychain::Store::new().unwrap());
 
     // TODO: add keyring store for android
