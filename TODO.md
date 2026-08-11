@@ -20,11 +20,9 @@
 - [ ] Write documentation
 - [ ] Handle refreshing of access token
 - [ ] Handle soft_logout
+- [ ] Code-sign application for Apple (IMPORTANT) and Windows
 
 - TODOs in files:
-  - Apple keyring store
-    - [ ] meteorite-core/Cargo.toml: transition to protected in the future?
-    - [ ] meteorite-core/src/init.rs: transition to protected in the future?
   - Android keyring store
     - [ ] meteorite-core/src/init.rs: add keyring store for android
     - [ ] meteorite-core/Cargo.toml: add keyring store for android
