@@ -23,9 +23,6 @@
 - [ ] Code-sign application for Apple (IMPORTANT) and Windows
 
 - TODOs in files:
-  - Android keyring store
-    - [ ] meteorite-core/src/init.rs: add keyring store for android
-    - [ ] meteorite-core/Cargo.toml: add keyring store for android
   - Login
     - [ ] meteorite-core/src/auth.rs: split functions into helpers
     - [ ] meteorite-core/src/auth.rs: check if access token expired
