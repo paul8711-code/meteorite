@@ -50,8 +50,8 @@ fn setup_keyring() -> Result<(), keyring_core::Error> {
     // TODO: transition to protected in the future?
     // protected requires code-signed application (which we should do anyways, possibly just use self-signed one to avoid paying)
     keyring_core::set_default_store(apple_native_keyring_store::keychain::Store::new().unwrap());
-
-    // TODO: add keyring store for android
+    #[cfg(target_os = "android")]
+    keyring_core::set_default_store(android_native_keyring_store::Store::new()?);
     Ok(())
 }
 
