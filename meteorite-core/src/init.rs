@@ -51,7 +51,7 @@ fn setup_keyring() -> Result<(), keyring_core::Error> {
     keyring_core::set_default_store(apple_native_keyring_store::protected::Store::new().unwrap());
     #[cfg(target_os = "android")]
     keyring_core::set_default_store(android_native_keyring_store::Store::new()?);
-  
+
     Ok(())
 }
 
