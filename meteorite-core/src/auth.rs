@@ -170,15 +170,6 @@ pub enum LoginChoice {
     },
 }
 
-// custom error type to let the ui know what to display
-#[derive(thiserror::Error, Debug)]
-pub enum LoginError {
-    #[error("No account is active")]
-    NoAccountActive,
-    #[error(transparent)]
-    Other(#[from] anyhow::Error),
-}
-
 /// Retrieves all supported login types for a given homeserver.
 ///
 /// Returns an empty list if no compatible login methods (like Password,
@@ -238,10 +229,8 @@ pub async fn get_login_types(homeserver: &str) -> anyhow::Result<Vec<LoginChoice
 /// Also reads the files necessary to login the user (users.toml, encrypted files, keyring entry).
 /// On success, an authenticated Client is returned.
 ///
-/// # Errors
-/// Returns the [`LoginError::NoAccountActive`] variant if no account or multiple accounts are
-/// currently active. On any other error, the [`LoginError::Other`] variant is returned.
-pub async fn login() -> Result<Client, LoginError> {
+/// Can return `None` instead of a client when there is no active account
+pub async fn login() -> anyhow::Result<Option<Client>> {
     tokio::task::spawn_blocking(move || {
         let runtime = tokio::runtime::Handle::current();
 
@@ -253,7 +242,9 @@ pub async fn login() -> Result<Client, LoginError> {
             let users_path = account_path.join("users.toml");
 
             let accounts = load_account_list(&users_path)?;
-            let account_data = active_account(&accounts.accounts)?;
+            let Some(account_data) = active_account(&accounts.accounts) else {
+                return Ok(None);
+            };
 
             // define the paths once
             let secure_path = account_path.join(format!("{}.enc", account_data.id));
@@ -291,11 +282,10 @@ pub async fn login() -> Result<Client, LoginError> {
                 .await
                 .map_err(|e| anyhow::anyhow!(e))?;
 
-            Ok(client)
+            Ok(Some(client))
         })
     })
-    .await
-    .map_err(|e| LoginError::Other(e.into()))?
+    .await?
 }
 
 /// Tries to log a user in via their homeserver.
@@ -516,7 +506,7 @@ fn load_secure_account_data(
     toml::from_slice(&decrypted_bytes).map_err(|e| anyhow::anyhow!(e))
 }
 
-fn active_account(accounts: &[AccountData]) -> Result<&AccountData, LoginError> {
+fn active_account(accounts: &[AccountData]) -> Option<&AccountData> {
     // filter the accounts for only active accounts
     let mut active_accounts = accounts.iter().filter(|a| a.active);
     // if multiple, no account is active
@@ -524,7 +514,6 @@ fn active_account(accounts: &[AccountData]) -> Result<&AccountData, LoginError> 
         (Some(account), None) => Some(account),
         _ => None,
     }
-    .ok_or(LoginError::NoAccountActive)
 }
 
 fn load_encryption_passphrase(id: &str) -> Result<String, keyring_core::Error> {
