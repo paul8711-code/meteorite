@@ -31,15 +31,16 @@ pub fn LoadingScreen(mut state: Signal<UiState>) -> Element {
 
         match login_result {
             Ok(client) => {
-                *CLIENT.write() = Some(client);
-                state.set(UiState::Main)
+                if let Some(client) = client {
+                    *CLIENT.write() = Some(client);
+                    state.set(UiState::Main)
+                } else {
+                    state.set(UiState::Login);
+                }
             }
-            Err(e) => match e {
-                auth::LoginError::NoAccountActive => state.set(UiState::Login),
-                auth::LoginError::Other(_) => state.set(UiState::Error {
-                    message: e.to_string(),
-                }),
-            },
+            Err(e) => state.set(UiState::Error {
+                message: e.to_string(),
+            }),
         }
     });
 
