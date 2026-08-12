@@ -160,8 +160,8 @@ pub enum LoginChoice {
     Password,
     /// SSO login
     Sso {
-        /// The identity provider (e.g. Github)
-        identity_provider: Option<IdentityProvider>,
+        /// The identity providers (e.g. Github)
+        identity_providers: Vec<IdentityProvider>,
     },
     /// OAuth 2.0 login
     Oauth {
@@ -183,41 +183,30 @@ pub async fn get_login_types(homeserver: &str) -> anyhow::Result<Vec<LoginChoice
 
     let mut types = Vec::new();
     let login_types = client.matrix_auth().get_login_types().await?.flows;
+
     let oauth_supported = client.oauth().server_metadata().await.is_ok();
 
-    for login_type in &login_types {
-        match login_type {
-            LoginType::Password(_) => types.push(LoginChoice::Password),
-            LoginType::Sso(sso) => {
-                if sso.oauth_aware_preferred && oauth_supported {
-                    types.push(LoginChoice::Oauth { preferred: true });
-                }
-                // check for token type, if unsupported login_token will fail
-                if login_types.iter().any(|x| matches!(x, LoginType::Token(_))) {
-                    if sso.identity_providers.is_empty() {
-                        types.push(LoginChoice::Sso {
-                            identity_provider: None,
-                        });
-                    } else {
-                        types.extend(sso.identity_providers.clone().into_iter().map(
-                            |identity_provider| LoginChoice::Sso {
-                                identity_provider: Some(identity_provider),
-                            },
-                        ));
-                    }
-                }
-            }
-            // we dont support ApplicationService login, Token login is already checked for above
-            _ => {}
-        }
-    }
-
-    if !types
+    if login_types
         .iter()
-        .any(|x| matches!(x, LoginChoice::Oauth { preferred: true }))
-        && oauth_supported
+        .any(|t| matches!(t, LoginType::Password(_)))
     {
-        types.push(LoginChoice::Oauth { preferred: false });
+        types.push(LoginChoice::Password);
+    } else if let Some(sso) = login_types.iter().find_map(|t| match t {
+        LoginType::Sso(sso) => Some(sso),
+        _ => None,
+    }) {
+        if oauth_supported {
+            types.push(LoginChoice::Oauth {
+                preferred: sso.oauth_aware_preferred,
+            })
+        }
+
+        // also check for `LoginType::Token`, if it is unsupported, login_token will fail
+        if login_types.iter().any(|t| matches!(t, LoginType::Token(_))) {
+            types.push(LoginChoice::Sso {
+                identity_providers: sso.identity_providers.clone(),
+            });
+        }
     }
 
     // ui has to handle empty types
