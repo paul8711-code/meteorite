@@ -41,7 +41,18 @@ pub fn ErrorScreen(mut state: Signal<UiState>, message: String) -> Element {
                             size: "w-64 h-64",
                         }
                     }
-                    // TODO: possibly add retry button
+
+                    div {
+                        class: "h-[50px]",
+                    }
+
+                    button {
+                        class: "w-full py-2 bg-red-600 hover:bg-red-500 rounded-lg text-white font-medium transition-colors cursor-pointer",
+                        onclick: move |_| {
+                            println!("retry failed function");
+                        },
+                        "Retry"
+                    }
                 }
                 components::Footer {}
             }

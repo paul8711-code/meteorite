@@ -75,6 +75,9 @@ fn App() -> Element {
     if let Some(e) = keyring_error {
         current_state.set(UiState::Error { message: e })
     }
+    current_state.set(UiState::Error {
+        message: "this is a test error".to_string(),
+    });
 
     rsx! {
         // TODO: adjust title based on what the user is doing, e.g. (3) meteorite - Matrix HQ
