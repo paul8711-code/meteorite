@@ -32,7 +32,7 @@ pub fn MainScreen() -> Element {
 
                 button {
                     onclick: move |_| println!("home"),
-                    class: "w-[50px] h-[50px] rounded-[20px] m-1 p-0 bg-none overflow-hidden border border-neutral-600",
+                    class: "w-12 h-12 rounded-2xl m-1 p-0 bg-none overflow-hidden border border-neutral-600",
 
                     img {
                         src: asset!("/assets/home.png"),

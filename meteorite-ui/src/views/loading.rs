@@ -59,7 +59,7 @@ pub fn LoadingScreen(mut state: Signal<UiState>) -> Element {
                     div {
                         class: "mt-12",
                         components::Icon {
-                            size: "h-[256px] w-[256px]",
+                            size: "h-64 w-64",
                         }
                     }
 
