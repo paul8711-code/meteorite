@@ -21,6 +21,7 @@
 - [ ] Handle soft_logout
 - [ ] Code-sign application for Apple (IMPORTANT) and Windows
 - [ ] Translations (weblate)
+- [ ] proper-er error handling for loading screen login
 
 - TODOs in files:
   - Login
