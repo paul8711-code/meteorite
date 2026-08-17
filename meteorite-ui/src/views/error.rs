@@ -25,9 +25,9 @@ pub fn ErrorScreen(mut state: Signal<UiState>, message: String) -> Element {
         components::Bg {
             div {
                 div {
-                    class: "fixed top-[50px] left-1/2 -translate-x-1/2 z-50 flex flex-col items-center transition-opacity duration-300 ease-in-out opacity-100 animate-fade-in",
+                    class: "fixed top-12 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center transition-opacity duration-300 ease-in-out opacity-100 animate-fade-in",
                     div {
-                        class: "p-4 rounded-[10px] bg-[#ff7878] border-[3px] border-[#ff0000] text-[#141414] font-medium shadow-lg text-center",
+                        class: "p-4 rounded-xl bg-red-400 border-3 border-red-600 text-neutral-800 font-medium shadow-lg text-center",
                         "{message}"
                     }
 
@@ -38,7 +38,7 @@ pub fn ErrorScreen(mut state: Signal<UiState>, message: String) -> Element {
                     div {
                         class: "flex items-center justify-center",
                         components::Icon {
-                            size: "w-[256px] h-[256px]",
+                            size: "w-64 h-64",
                         }
                     }
                     // TODO: possibly add retry button

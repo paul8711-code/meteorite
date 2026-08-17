@@ -144,11 +144,11 @@ pub fn LoginScreen(mut state: Signal<UiState>) -> Element {
                 }
 
                 div {
-                    class: "w-full max-w-[340px] bg-neutral-800 border border-neutral-700 rounded-xl p-4 shadow-2xl transition-all duration-300 ease-in-out overflow-hidden {window_height}",
+                    class: "w-full max-w-85 bg-neutral-800 border border-neutral-700 rounded-xl p-4 shadow-2xl transition-all duration-300 ease-in-out overflow-hidden {window_height}",
                     div {
                         class: "flex flex-col items-center mb-4",
                         components::Icon {
-                            size: "h-[64px] w-[64px]",
+                            size: "h-16 w-16",
                         }
                     }
 
