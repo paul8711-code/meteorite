@@ -22,7 +22,7 @@ thiserror = "2.0.18"
 tokio = { workspace = true }
 toml = "1.1.2"
 url = "2.5.8"
-webbrowser = "1.2.0"
+webbrowser = { workspace = true }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-native-keyring-store = "1.1.0"

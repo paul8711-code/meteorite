@@ -22,29 +22,33 @@ use dioxus::prelude::*;
 #[component]
 pub fn LoadingScreen(mut state: Signal<UiState>) -> Element {
     let mut starts_fading = use_signal(|| false);
+    let mut error = use_signal(|| Option::<String>::None);
+    let mut retry = use_signal(|| 0);
 
-    use_future(move || async move {
-        let login_result = auth::login().await;
+    let _login = use_resource(move || {
+        let _ = retry();
 
-        starts_fading.set(true);
-        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+        async move {
+            let login_result = auth::login().await;
 
-        match login_result {
-            Ok(client) => {
-                if let Some(client) = client {
-                    *CLIENT.write() = Some(client);
-                    state.set(UiState::Main)
-                } else {
-                    state.set(UiState::Login);
+            starts_fading.set(true);
+            tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+
+            match login_result {
+                Ok(client) => {
+                    if let Some(client) = client {
+                        *CLIENT.write() = Some(client);
+                        state.set(UiState::Main)
+                    } else {
+                        state.set(UiState::Login);
+                    }
                 }
+                Err(e) => error.set(Some(e.to_string())),
             }
-            Err(e) => state.set(UiState::Error {
-                message: e.to_string(),
-            }),
         }
     });
 
-    let opacity = if starts_fading() {
+    let opacity = if starts_fading() && error.read().is_none() {
         "opacity-0"
     } else {
         "opacity-100"
@@ -63,10 +67,35 @@ pub fn LoadingScreen(mut state: Signal<UiState>) -> Element {
                         }
                     }
 
-                    div {
-                        class: "text-center mt-16",
-                        components::Spinner {
-                            size: "h-32 w-32",
+                    if let Some(e) = &*error.read() {
+                        div {
+                            class: "h-12",
+                        }
+
+                        p {
+                            class: "p-4 rounded-xl bg-red-400 border-3 border-red-600 text-neutral-800 font-medium shadow-lg text-center",
+                            "{e}"
+                        }
+
+                        div {
+                            class: "h-12",
+                        }
+
+                        button {
+                            class: "w-1/5 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-white font-medium transition-colors cursor-pointer",
+                            onclick: move |_| {
+                                error.set(None);
+                                starts_fading.set(false);
+                                retry += 1;
+                            },
+                            "Retry"
+                        }
+                    } else {
+                        div {
+                            class: "text-center mt-16",
+                            components::Spinner {
+                                size: "h-32 w-32",
+                            }
                         }
                     }
                 }

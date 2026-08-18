@@ -11,6 +11,7 @@ repository = "https://github.com/paul8711-code/meteorite"
 meteorite-core = { path = "../meteorite-core" }
 
 tokio = { workspace = true }
+webbrowser = { workspace = true }
 
 dioxus = { version = "0.7.1", features = [] }
 

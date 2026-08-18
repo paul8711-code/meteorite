@@ -4565,6 +4565,7 @@ dependencies = [
  "dioxus",
  "meteorite-core",
  "tokio",
+ "webbrowser",
 ]
 
 [[package]]
