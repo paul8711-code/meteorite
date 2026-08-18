@@ -53,6 +53,8 @@ static CLIENT: GlobalSignal<Option<Client>> = Signal::global(|| None::<Client>);
 
 #[tokio::main]
 async fn main() {
+    init::setup_folders();
+
     // TODO: set icon
     LaunchBuilder::new()
         .with_cfg(desktop! {
@@ -67,8 +69,10 @@ async fn main() {
 #[component]
 fn App() -> Element {
     let mut current_state = use_signal(|| UiState::Loading);
-    if let Err(e) = init::setup() {
-        current_state.set(UiState::Error { message: e })
+    if let Err(e) = init::setup_keyring() {
+        current_state.set(UiState::Error {
+            message: format!("The application failed to set up the keyring store.\n\nDetails: {e}"),
+        })
     }
     let _keyring_guard = use_signal(|| meteorite_core::KeyringGuard);
     current_state.set(UiState::Error {
