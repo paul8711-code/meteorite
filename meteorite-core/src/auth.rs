@@ -220,61 +220,50 @@ pub async fn get_login_types(homeserver: &str) -> anyhow::Result<Vec<LoginChoice
 ///
 /// Can return `None` instead of a client when there is no active account
 pub async fn login() -> anyhow::Result<Option<Client>> {
-    tokio::task::spawn_blocking(move || {
-        let runtime = tokio::runtime::Handle::current();
+    // first remove possible leftovers
+    remove_orphaned_accounts();
 
-        runtime.block_on(async move {
-            // first remove possible leftovers
-            remove_orphaned_accounts();
+    let account_path = utils::unwrap_lock(&ACCOUNT_PATH);
+    let users_path = account_path.join("users.toml");
 
-            let account_path = utils::unwrap_lock(&ACCOUNT_PATH);
-            let users_path = account_path.join("users.toml");
+    let accounts = load_account_list(&users_path)?;
+    let Some(account_data) = active_account(&accounts.accounts) else {
+        return Ok(None);
+    };
 
-            let accounts = load_account_list(&users_path)?;
-            let Some(account_data) = active_account(&accounts.accounts) else {
-                return Ok(None);
-            };
+    // define the paths once
+    let secure_path = account_path.join(format!("{}.enc", account_data.id));
+    let sqlite_path = account_path.join(&account_data.id);
 
-            // define the paths once
-            let secure_path = account_path.join(format!("{}.enc", account_data.id));
-            let sqlite_path = account_path.join(&account_data.id);
+    let encryption_passphrase = load_encryption_passphrase(&account_data.id)?;
 
-            let encryption_passphrase =
-                load_encryption_passphrase(&account_data.id).map_err(|e| anyhow::anyhow!(e))?;
+    let secure_account_data = load_secure_account_data(&secure_path, &encryption_passphrase)?;
 
-            let secure_account_data =
-                load_secure_account_data(&secure_path, &encryption_passphrase)?;
+    // construct the client
+    let client = Client::builder()
+        .server_name_or_homeserver_url(account_data.user_id.server_name())
+        .sqlite_store(
+            sqlite_path,
+            Some(&encryption_passphrase), // same as for encrypted files
+        )
+        .build()
+        .await?;
 
-            // construct the client
-            let client = Client::builder()
-                .server_name_or_homeserver_url(account_data.user_id.server_name())
-                .sqlite_store(
-                    sqlite_path,
-                    Some(&encryption_passphrase), // same as for encrypted files
-                )
-                .build()
-                .await
-                .map_err(|e| anyhow::anyhow!(e))?;
+    // TODO: check if access token expired
+    // if yes:
+    // -> refresh using refresh token
+    // -> save new token and expiration date
 
-            // TODO: check if access token expired
-            // if yes:
-            // -> refresh using refresh token
-            // -> save new token and expiration date
+    // restore session from the unified account struct
+    client
+        .matrix_auth()
+        .restore_session(
+            matrix_session_from_account(account_data, &secure_account_data),
+            RoomLoadSettings::default(),
+        )
+        .await?;
 
-            // restore session from the unified account struct
-            client
-                .matrix_auth()
-                .restore_session(
-                    matrix_session_from_account(account_data, &secure_account_data),
-                    RoomLoadSettings::default(),
-                )
-                .await
-                .map_err(|e| anyhow::anyhow!(e))?;
-
-            Ok(Some(client))
-        })
-    })
-    .await?
+    Ok(Some(client))
 }
 
 /// Tries to log a user in via their homeserver.
