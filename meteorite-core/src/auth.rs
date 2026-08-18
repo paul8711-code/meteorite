@@ -220,61 +220,50 @@ pub async fn get_login_types(homeserver: &str) -> anyhow::Result<Vec<LoginChoice
 ///
 /// Can return `None` instead of a client when there is no active account
 pub async fn login() -> anyhow::Result<Option<Client>> {
-    tokio::task::spawn_blocking(move || {
-        let runtime = tokio::runtime::Handle::current();
+    // first remove possible leftovers
+    remove_orphaned_accounts();
 
-        runtime.block_on(async move {
-            // first remove possible leftovers
-            remove_orphaned_accounts();
+    let account_path = utils::unwrap_lock(&ACCOUNT_PATH);
+    let users_path = account_path.join("users.toml");
 
-            let account_path = utils::unwrap_lock(&ACCOUNT_PATH);
-            let users_path = account_path.join("users.toml");
+    let accounts = load_account_list(&users_path)?;
+    let Some(account_data) = active_account(&accounts.accounts) else {
+        return Ok(None);
+    };
 
-            let accounts = load_account_list(&users_path)?;
-            let Some(account_data) = active_account(&accounts.accounts) else {
-                return Ok(None);
-            };
+    // define the paths once
+    let secure_path = account_path.join(format!("{}.enc", account_data.id));
+    let sqlite_path = account_path.join(&account_data.id);
 
-            // define the paths once
-            let secure_path = account_path.join(format!("{}.enc", account_data.id));
-            let sqlite_path = account_path.join(&account_data.id);
+    let encryption_passphrase = load_encryption_passphrase(&account_data.id)?;
 
-            let encryption_passphrase =
-                load_encryption_passphrase(&account_data.id).map_err(|e| anyhow::anyhow!(e))?;
+    let secure_account_data = load_secure_account_data(&secure_path, &encryption_passphrase)?;
 
-            let secure_account_data =
-                load_secure_account_data(&secure_path, &encryption_passphrase)?;
+    // construct the client
+    let client = Client::builder()
+        .server_name_or_homeserver_url(account_data.user_id.server_name())
+        .sqlite_store(
+            sqlite_path,
+            Some(&encryption_passphrase), // same as for encrypted files
+        )
+        .build()
+        .await?;
 
-            // construct the client
-            let client = Client::builder()
-                .server_name_or_homeserver_url(account_data.user_id.server_name())
-                .sqlite_store(
-                    sqlite_path,
-                    Some(&encryption_passphrase), // same as for encrypted files
-                )
-                .build()
-                .await
-                .map_err(|e| anyhow::anyhow!(e))?;
+    // TODO: check if access token expired
+    // if yes:
+    // -> refresh using refresh token
+    // -> save new token and expiration date
 
-            // TODO: check if access token expired
-            // if yes:
-            // -> refresh using refresh token
-            // -> save new token and expiration date
+    // restore session from the unified account struct
+    client
+        .matrix_auth()
+        .restore_session(
+            matrix_session_from_account(account_data, &secure_account_data),
+            RoomLoadSettings::default(),
+        )
+        .await?;
 
-            // restore session from the unified account struct
-            client
-                .matrix_auth()
-                .restore_session(
-                    matrix_session_from_account(account_data, &secure_account_data),
-                    RoomLoadSettings::default(),
-                )
-                .await
-                .map_err(|e| anyhow::anyhow!(e))?;
-
-            Ok(Some(client))
-        })
-    })
-    .await?
+    Ok(Some(client))
 }
 
 /// Tries to log a user in via their homeserver.
@@ -288,62 +277,56 @@ pub async fn login_sso(
     homeserver: String,
     tx: mpsc::UnboundedSender<String>,
 ) -> anyhow::Result<Client> {
-    tokio::task::spawn_blocking(move || {
-        let runtime = tokio::runtime::Handle::current();
+    // first remove possible leftovers
+    remove_orphaned_accounts();
 
-        runtime.block_on(async move {
-            // first remove possible leftovers
-            remove_orphaned_accounts();
+    // initialize rng for later usage
+    let (id, encryption_passphrase) = generate_account_credentials();
 
-            // initialize rng for later usage
-            let (id, encryption_passphrase) = generate_account_credentials();
+    // define the paths once
+    let account_path = utils::unwrap_lock(&ACCOUNT_PATH);
 
-            // define the paths once
-            let account_path = utils::unwrap_lock(&ACCOUNT_PATH);
+    let sqlite_path = account_path.join(&id);
 
-            let sqlite_path = account_path.join(&id);
+    tokio::fs::create_dir_all(&account_path).await?;
 
-            fs::create_dir_all(&account_path).map_err(|e| anyhow::anyhow!(e))?;
+    // construct the client
+    let client = Client::builder()
+        .server_name_or_homeserver_url(homeserver)
+        .sqlite_store(&sqlite_path, Some(&encryption_passphrase))
+        .build()
+        .await?;
 
-            // construct the client
-            let client = Client::builder()
-                .server_name_or_homeserver_url(homeserver)
-                .sqlite_store(&sqlite_path, Some(&encryption_passphrase))
-                .build()
-                .await
-                .map_err(|e| anyhow::anyhow!(e))?;
-
-            // start sso login
-            let response = client
-                .matrix_auth()
-                .login_sso(|sso_url| async move {
-                    if webbrowser::open(&sso_url).is_ok() {
-                        tx.send("Go to the opened website to authenticate".to_string())
-                            .ok();
-                    } else {
-                        tx.send(format!("Navigate to {sso_url} in a browser of choice"))
-                            .ok();
-                    }
-                    Ok(())
-                })
-                .initial_device_display_name("meteorite Client")
-                .await
-                .map_err(|e| anyhow::anyhow!(e))?;
-
-            // construct new secure account data from response
-            let secure_data = SecureAccountData::new(
-                response.access_token,
-                response.refresh_token,
-                response.expires_in,
-                response.device_id,
-            );
-
-            save_account(&id, response.user_id, &secure_data, &encryption_passphrase)?;
-
-            Ok(client)
+    // start sso login
+    let response = client
+        .matrix_auth()
+        .login_sso(|sso_url| async move {
+            if webbrowser::open(&sso_url).is_ok() {
+                tx.send("Go to the opened website to authenticate".to_string())
+                    .ok();
+            } else {
+                tx.send(format!("Navigate to {sso_url} in a browser of choice"))
+                    .ok();
+            }
+            Ok(())
         })
+        .initial_device_display_name("meteorite Client")
+        .await?;
+
+    // construct new secure account data from response
+    let secure_data = SecureAccountData::new(
+        response.access_token,
+        response.refresh_token,
+        response.expires_in,
+        response.device_id,
+    );
+
+    tokio::task::spawn_blocking(move || {
+        save_account(&id, response.user_id, &secure_data, &encryption_passphrase)
     })
-    .await?
+    .await??;
+
+    Ok(client)
 }
 
 fn remove_orphaned_accounts() {
@@ -473,12 +456,19 @@ fn remove_orphaned_accounts() {
     fs::write(&users_path, toml_account_data).ok();
 }
 
+fn atomic_write<C: AsRef<[u8]>>(target: &Path, contents: C) -> anyhow::Result<()> {
+    let tmp = target.with_extension("tmp");
+    fs::write(&tmp, contents)?;
+    fs::rename(&tmp, target)?;
+    Ok(())
+}
+
 fn load_account_list(path: &Path) -> anyhow::Result<AccountList> {
     if !path.exists() {
         return Ok(AccountList::default());
     }
 
-    let toml_account_data = fs::read_to_string(path).map_err(|e| anyhow::anyhow!(e))?;
+    let toml_account_data = fs::read_to_string(path)?;
     toml::from_str(&toml_account_data).map_err(|e| anyhow::anyhow!(e))
 }
 
@@ -487,11 +477,11 @@ fn load_secure_account_data(
     encryption_passphrase: &str,
 ) -> anyhow::Result<SecureAccountData> {
     // load encrypted file contents
-    let data = fs::read(path).map_err(|e| anyhow::anyhow!(e))?;
+    let data = fs::read(path)?;
 
     // get identity from passphrase
     let identity = age::scrypt::Identity::new(SecretString::from(encryption_passphrase));
-    let decrypted_bytes = age::decrypt(&identity, &data).map_err(|e| anyhow::anyhow!(e))?;
+    let decrypted_bytes = age::decrypt(&identity, &data)?;
     toml::from_slice(&decrypted_bytes).map_err(|e| anyhow::anyhow!(e))
 }
 
@@ -529,30 +519,26 @@ fn save_account(
 ) -> anyhow::Result<()> {
     let account_path = utils::unwrap_lock(&ACCOUNT_PATH);
 
-    let backup_tmp_path = account_path.join("users.toml.backup.tmp");
     let backup_path = account_path.join("users.toml.backup");
-    let users_tmp_path = account_path.join("users.toml.tmp");
     let users_path = account_path.join("users.toml");
-    let encrypted_tmp_path = account_path.join(format!("{id}.enc.tmp"));
     let encrypted_path = account_path.join(format!("{id}.enc"));
     let sqlite_path = account_path.join(id);
 
     // secure_data struct -> toml
-    let serialized = toml::to_string(secure_data).map_err(|e| anyhow::anyhow!(e))?;
+    let serialized = toml::to_string(secure_data)?;
 
     // get recipient from passphrase
     let recipient = age::scrypt::Recipient::new(SecretString::from(encryption_passphrase));
 
     // encrypt secure data
-    let encrypted_bytes =
-        age::encrypt(&recipient, serialized.as_bytes()).map_err(|e| anyhow::anyhow!(e))?;
+    let encrypted_bytes = age::encrypt(&recipient, serialized.as_bytes())?;
 
-    let encryption_passphrase_entry = Entry::new(APP_NAME, id).map_err(|e| anyhow::anyhow!(e))?;
+    let encryption_passphrase_entry = Entry::new(APP_NAME, id)?;
 
     // create guard as soon as possible
     let mut guard = AccountCreationGuard {
         backup_path: backup_path.clone(),
-        backup_tmp_path: backup_tmp_path.clone(),
+        backup_tmp_path: backup_path.with_extension("tmp").clone(),
         backup_created: false,
 
         users_path: users_path.clone(),
@@ -560,8 +546,8 @@ fn save_account(
         sqlite_path: sqlite_path.clone(),
         encrypted_path: encrypted_path.clone(),
 
-        users_tmp_path: users_tmp_path.clone(),
-        encrypted_tmp_path: encrypted_tmp_path.clone(),
+        users_tmp_path: users_path.with_extension("tmp").clone(),
+        encrypted_tmp_path: encrypted_path.with_extension("tmp").clone(),
 
         keyring_entry: encryption_passphrase_entry,
         keyring_created: false,
@@ -571,16 +557,15 @@ fn save_account(
 
     // read unencrypted file with all users
     let mut accounts: AccountList = if users_path.exists() {
-        let toml_account_data = fs::read_to_string(&users_path).map_err(|e| anyhow::anyhow!(e))?;
-        toml::from_str(&toml_account_data).map_err(|e| anyhow::anyhow!(e))?
+        let toml_account_data = fs::read_to_string(&users_path)?;
+        toml::from_str(&toml_account_data)?
     } else {
         AccountList::default()
     };
 
     // create backup of accounts
-    let toml_account_data = toml::to_string(&accounts).map_err(|e| anyhow::anyhow!(e))?;
-    fs::write(&backup_tmp_path, &toml_account_data).map_err(|e| anyhow::anyhow!(e))?;
-    fs::rename(&backup_tmp_path, &backup_path).map_err(|e| anyhow::anyhow!(e))?;
+    let toml_account_data = toml::to_string(&accounts)?;
+    atomic_write(&backup_path, &toml_account_data)?;
 
     guard.backup_created = true;
 
@@ -594,23 +579,16 @@ fn save_account(
         active: true,
     });
 
-    let toml_account_data = toml::to_string(&accounts).map_err(|e| anyhow::anyhow!(e))?;
+    let toml_account_data = toml::to_string(&accounts)?;
 
     // write bytes to encrypted file
-    fs::write(&encrypted_tmp_path, &encrypted_bytes).map_err(|e| anyhow::anyhow!(e))?;
-
-    fs::rename(&encrypted_tmp_path, &encrypted_path).map_err(|e| anyhow::anyhow!(e))?;
+    atomic_write(&encrypted_path, &encrypted_bytes)?;
 
     // write unencrypted file
-    fs::write(&users_tmp_path, toml_account_data).map_err(|e| anyhow::anyhow!(e))?;
-
-    fs::rename(&users_tmp_path, &users_path).map_err(|e| anyhow::anyhow!(e))?;
+    atomic_write(&users_path, toml_account_data)?;
 
     // save encryption passphrase to keyring (used for file encryption and db encryption)
-    guard
-        .keyring_entry
-        .set_password(encryption_passphrase)
-        .map_err(|e| anyhow::anyhow!(e))?;
+    guard.keyring_entry.set_password(encryption_passphrase)?;
 
     guard.keyring_created = true;
 
