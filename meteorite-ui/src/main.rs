@@ -39,7 +39,6 @@ enum LoginStage {
 #[derive(PartialEq, Clone)]
 enum UiState {
     Loading,
-    Error { message: String },
     Login,
     Main,
 }
@@ -68,16 +67,9 @@ async fn main() {
 
 #[component]
 fn App() -> Element {
-    let mut current_state = use_signal(|| UiState::Loading);
-    if let Err(e) = init::setup_keyring() {
-        current_state.set(UiState::Error {
-            message: format!("The application failed to set up the keyring store.\n\nDetails: {e}"),
-        })
-    }
+    let current_state = use_signal(|| UiState::Loading);
+    let keyring_error = init::setup_keyring().err();
     let _keyring_guard = use_signal(|| meteorite_core::KeyringGuard);
-    current_state.set(UiState::Error {
-        message: "this is a test error".to_string(),
-    });
 
     rsx! {
         // TODO: adjust title based on what the user is doing, e.g. (3) meteorite - Matrix HQ
@@ -96,16 +88,14 @@ fn App() -> Element {
         div {
             class: "app-container font-sans text-base antialiased bg-neutral-900 text-white min-h-screen p-4",
 
+            if let Some(e) = keyring_error {
+                error::FatalError { message: format!("The application failed to set up the keyring store.\n\nDetails: {e}")}
+            }
+
             match &*current_state.read() {
                 UiState::Loading => rsx! {
                     loading::LoadingScreen {
                         state: current_state,
-                    }
-                },
-                UiState::Error { message } => rsx! {
-                    error::ErrorScreen {
-                        state: current_state,
-                        message: message.clone(),
                     }
                 },
                 UiState::Login => rsx! {

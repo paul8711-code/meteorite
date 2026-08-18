@@ -16,24 +16,16 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::{UiState, components};
+use super::components;
 use dioxus::prelude::*;
 
 #[component]
-pub fn ErrorScreen(mut state: Signal<UiState>, message: String) -> Element {
+pub fn FatalError(message: String) -> Element {
     rsx! {
         components::Bg {
             div {
                 div {
                     class: "fixed top-12 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center transition-opacity duration-300 ease-in-out opacity-100 animate-fade-in",
-                    div {
-                        class: "p-4 rounded-xl bg-red-400 border-3 border-red-600 text-neutral-800 font-medium shadow-lg text-center",
-                        "{message}"
-                    }
-
-                    div {
-                        class: "h-12",
-                    }
 
                     div {
                         class: "flex items-center justify-center",
@@ -46,12 +38,29 @@ pub fn ErrorScreen(mut state: Signal<UiState>, message: String) -> Element {
                         class: "h-12",
                     }
 
-                    button {
-                        class: "w-full py-2 bg-red-600 hover:bg-red-500 rounded-lg text-white font-medium transition-colors cursor-pointer",
-                        onclick: move |_| {
-                            println!("retry failed function");
-                        },
-                        "Retry"
+                    h1 {
+                        class: "text-white text-3xl text-center",
+                        "Unable to start the application"
+                    }
+
+                    p {
+                        class: "text-neutral-300 text-xl text-center my-4",
+                        "{message}"
+                    }
+
+                    p {
+                        class: "text-neutral-300 text-lg text-center",
+                        "Need help? Ask for help or "
+                        a {
+                            class: "text-cyan-400 hover:text-cyan-500",
+                            href: "#",
+                            onclick: move |evt| {
+                                evt.prevent_default();
+                                let _ = webbrowser::open("https://github.com/paul8711-code/meteorite/issues");
+                            },
+                            "open an issue on GitHub"
+                        }
+                        " and include the error details."
                     }
                 }
                 components::Footer {}
