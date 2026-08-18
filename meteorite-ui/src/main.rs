@@ -53,11 +53,8 @@ static CLIENT: GlobalSignal<Option<Client>> = Signal::global(|| None::<Client>);
 
 #[tokio::main]
 async fn main() {
-    let keyring_error = init::setup().err();
-
     // TODO: set icon
     LaunchBuilder::new()
-        .with_context(keyring_error)
         .with_cfg(desktop! {
             Config::default()
                 .with_data_directory(base_path())
@@ -70,8 +67,7 @@ async fn main() {
 #[component]
 fn App() -> Element {
     let mut current_state = use_signal(|| UiState::Loading);
-    let keyring_error = use_context::<Option<String>>();
-    if let Some(e) = keyring_error {
+    if let Err(e) = init::setup() {
         current_state.set(UiState::Error { message: e })
     }
     let _keyring_guard = use_signal(|| meteorite_core::KeyringGuard);
