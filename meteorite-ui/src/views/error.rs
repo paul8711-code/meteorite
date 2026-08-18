@@ -32,7 +32,7 @@ pub fn ErrorScreen(mut state: Signal<UiState>, message: String) -> Element {
                     }
 
                     div {
-                        class: "h-[50px]",
+                        class: "h-12",
                     }
 
                     div {
@@ -43,7 +43,7 @@ pub fn ErrorScreen(mut state: Signal<UiState>, message: String) -> Element {
                     }
 
                     div {
-                        class: "h-[50px]",
+                        class: "h-12",
                     }
 
                     button {
