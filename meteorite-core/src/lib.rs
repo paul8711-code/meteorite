@@ -30,6 +30,7 @@ static BASE_PATH: OnceLock<Mutex<PathBuf>> = OnceLock::new();
 static ACCOUNT_PATH: OnceLock<Mutex<PathBuf>> = OnceLock::new();
 
 /// Guard used to safely unset the default keyring store on exit
+#[derive(Clone)]
 pub struct KeyringGuard;
 
 impl Drop for KeyringGuard {

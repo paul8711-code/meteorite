@@ -54,7 +54,6 @@ static CLIENT: GlobalSignal<Option<Client>> = Signal::global(|| None::<Client>);
 #[tokio::main]
 async fn main() {
     let keyring_error = init::setup().err();
-    let _keyring_guard = meteorite_core::KeyringGuard;
 
     // TODO: set icon
     LaunchBuilder::new()
@@ -75,6 +74,7 @@ fn App() -> Element {
     if let Some(e) = keyring_error {
         current_state.set(UiState::Error { message: e })
     }
+    let _keyring_guard = use_signal(|| meteorite_core::KeyringGuard);
     current_state.set(UiState::Error {
         message: "this is a test error".to_string(),
     });
