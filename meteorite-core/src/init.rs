@@ -22,41 +22,23 @@ use std::sync::Mutex;
 
 // all functions in this file are used to inititalize something (e.g. set default keyring store)
 
-/// Initializes important variables and sets the default keyring store.
-///
-/// # Errors
-/// If any of the setup steps fail, an error containing the message for the UI to display is returned.
-pub fn setup() -> Result<(), String> {
-    match setup_keyring() {
-        Ok(()) => {}
-        Err(e) => {
-            return Err(format!(
-                "The application failed to set up the keyring store.\n\nDetails: {e}"
-            ));
-        }
-    }
-    setup_folders();
-
-    Ok(())
-}
-
-// sets default keyring store depending on os you are on
-fn setup_keyring() -> Result<(), keyring_core::Error> {
+/// Sets the default keyring store.
+pub fn setup_keyring() -> Result<(), keyring_core::Error> {
     #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     keyring_core::set_default_store(zbus_secret_service_keyring_store::Store::new()?);
     #[cfg(target_os = "windows")]
-    keyring_core::set_default_store(windows_native_keyring_store::Store::new().unwrap());
+    keyring_core::set_default_store(windows_native_keyring_store::Store::new()?);
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     // protected requires code-signed application (which we should do anyways, possibly just use self-signed one to avoid paying)
-    keyring_core::set_default_store(apple_native_keyring_store::protected::Store::new().unwrap());
+    keyring_core::set_default_store(apple_native_keyring_store::protected::Store::new()?);
     #[cfg(target_os = "android")]
     keyring_core::set_default_store(android_native_keyring_store::Store::new()?);
 
     Ok(())
 }
 
-// sets some path variables and creates necessary folders
-fn setup_folders() {
+/// Creates by the application required folders.
+pub fn setup_folders() {
     let base_path = sysdirs::data_local_dir().unwrap().join(APP_NAME);
     let account_path = base_path.join("accounts");
 
