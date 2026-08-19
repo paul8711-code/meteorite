@@ -30,20 +30,24 @@ pub fn LoadingScreen() -> Element {
         let _ = retry();
 
         async move {
-            let login_result = auth::login().await;
+            let handle = tokio::spawn(async move { auth::login().await });
 
-            starts_fading.set(true);
-            tokio::time::sleep(std::time::Duration::from_millis(250)).await;
-
-            match login_result {
-                Ok(client) => {
-                    if let Some(client) = client {
-                        *CLIENT.write() = Some(client);
-                    } else {
-                        login.set(true);
-                    }
+            match handle.await {
+                Ok(Ok(Some(client))) => {
+                    starts_fading.set(true);
+                    tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+                    *CLIENT.write() = Some(client);
                 }
-                Err(e) => error.set(Some(e.to_string())),
+                Ok(Ok(None)) => {
+                    login.set(true);
+                }
+                Ok(Err(e)) => {
+                    error.set(Some(e.to_string()));
+                }
+                Err(_) => {
+                    // *should* not happen
+                    error.set(Some("Task failed".to_string()));
+                }
             }
         }
     });
