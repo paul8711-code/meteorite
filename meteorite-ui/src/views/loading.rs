@@ -16,13 +16,14 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::{CLIENT, UiState, auth, components};
+use super::{CLIENT, auth, components, login};
 use dioxus::prelude::*;
 
 #[component]
-pub fn LoadingScreen(mut state: Signal<UiState>) -> Element {
+pub fn LoadingScreen() -> Element {
     let mut starts_fading = use_signal(|| false);
     let mut error = use_signal(|| Option::<String>::None);
+    let mut login = use_signal(|| false);
     let mut retry = use_signal(|| 0);
 
     let _login = use_resource(move || {
@@ -38,9 +39,8 @@ pub fn LoadingScreen(mut state: Signal<UiState>) -> Element {
                 Ok(client) => {
                     if let Some(client) = client {
                         *CLIENT.write() = Some(client);
-                        state.set(UiState::Main)
                     } else {
-                        state.set(UiState::Login);
+                        login.set(true);
                     }
                 }
                 Err(e) => error.set(Some(e.to_string())),
@@ -54,52 +54,58 @@ pub fn LoadingScreen(mut state: Signal<UiState>) -> Element {
         "opacity-100"
     };
 
-    rsx! {
-        components::Bg {
-            div {
-                class: "{opacity} transition-opacity duration-250 ease-in-out",
+    if *login.read() {
+        rsx! {
+            login::LoginScreen {}
+        }
+    } else {
+        rsx! {
+            components::Bg {
                 div {
-                    class: "flex flex-col items-center min-h-screen relative",
+                    class: "{opacity} transition-opacity duration-250 ease-in-out",
                     div {
-                        class: "mt-12",
-                        components::Icon {
-                            size: "h-64 w-64",
-                        }
-                    }
-
-                    if let Some(e) = &*error.read() {
+                        class: "flex flex-col items-center min-h-screen relative",
                         div {
-                            class: "h-12",
+                            class: "mt-12",
+                            components::Icon {
+                                size: "h-64 w-64",
+                            }
                         }
 
-                        p {
-                            class: "p-4 rounded-xl bg-red-400 border-3 border-red-600 text-neutral-800 font-medium shadow-lg text-center",
-                            "{e}"
-                        }
+                        if let Some(e) = &*error.read() {
+                            div {
+                                class: "h-12",
+                            }
 
-                        div {
-                            class: "h-12",
-                        }
+                            p {
+                                class: "p-4 rounded-xl bg-red-400 border-3 border-red-600 text-neutral-800 font-medium shadow-lg text-center",
+                                "{e}"
+                            }
 
-                        button {
-                            class: "w-1/5 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-white font-medium transition-colors cursor-pointer",
-                            onclick: move |_| {
-                                error.set(None);
-                                starts_fading.set(false);
-                                retry += 1;
-                            },
-                            "Retry"
-                        }
-                    } else {
-                        div {
-                            class: "text-center mt-16",
-                            components::Spinner {
-                                size: "h-32 w-32",
+                            div {
+                                class: "h-12",
+                            }
+
+                            button {
+                                class: "w-1/5 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-white font-medium transition-colors cursor-pointer",
+                                onclick: move |_| {
+                                    error.set(None);
+                                    starts_fading.set(false);
+                                    retry += 1;
+                                },
+                                "Retry"
+                            }
+                        } else {
+                            div {
+                                class: "text-center mt-16",
+                                components::Spinner {
+                                    size: "h-32 w-32",
+                                }
                             }
                         }
                     }
+                    components::Footer {}
                 }
-                components::Footer {}
             }
         }
     }

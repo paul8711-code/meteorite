@@ -26,21 +26,13 @@ use meteorite_core::{auth, base_path, init};
 mod components;
 mod views;
 
-use views::{error, loading, login, main};
+use views::{error, main};
 
 #[derive(PartialEq, Clone, Copy, Default)]
 enum LoginStage {
     #[default]
     Homeserver,
     Credentials,
-}
-
-// TODO: no states but instead functions for each state
-#[derive(PartialEq, Clone)]
-enum UiState {
-    Loading,
-    Login,
-    Main,
 }
 
 const ICON: Asset = asset!("/assets/icon/icon.png");
@@ -67,7 +59,6 @@ async fn main() {
 
 #[component]
 fn App() -> Element {
-    let current_state = use_signal(|| UiState::Loading);
     let keyring_error = init::setup_keyring().err();
     let _keyring_guard = use_signal(|| meteorite_core::KeyringGuard);
 
@@ -92,21 +83,7 @@ fn App() -> Element {
                 error::FatalError { message: format!("The application failed to set up the keyring store.\n\nDetails: {e}")}
             }
 
-            match &*current_state.read() {
-                UiState::Loading => rsx! {
-                    loading::LoadingScreen {
-                        state: current_state,
-                    }
-                },
-                UiState::Login => rsx! {
-                    login::LoginScreen {
-                        state: current_state,
-                    }
-                },
-                UiState::Main => rsx! {
-                    main::MainScreen {}
-                },
-            }
+            main::MainScreen {}
         }
     }
 }

@@ -16,11 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use super::{CLIENT, LoginStage, UiState, auth, components};
+use super::{CLIENT, LoginStage, auth, components};
 use dioxus::prelude::*;
 
 #[component]
-pub fn LoginScreen(mut state: Signal<UiState>) -> Element {
+pub fn LoginScreen() -> Element {
     let mut current_stage = use_signal(LoginStage::default);
     let mut show_validation_errors = use_signal(|| false);
 
@@ -76,12 +76,12 @@ pub fn LoginScreen(mut state: Signal<UiState>) -> Element {
                         match res {
                             Ok(Ok(c)) => {
                                 *CLIENT.write() = Some(c);
-                                state.set(UiState::Main);
                             }
                             Ok(Err(e)) => {
                                 login_error.set(Some(e.to_string()));
                             }
                             Err(_) => {
+                                // *should* not happen
                                 login_error.set(Some("Authentication process aborted".into()));
                             }
                         }
