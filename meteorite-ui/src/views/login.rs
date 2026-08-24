@@ -95,7 +95,13 @@ pub fn LoginScreen() -> Element {
         current_task.set(Some(task));
     };
 
-    let submit_credentials = move |_| {
+    let start_username_login = move |_| {
+        if is_authenticating() {
+            return;
+        }
+
+        cancel_active_task();
+
         if username.read().is_empty() || password.read().is_empty() {
             show_validation_errors.set(true);
             return;
@@ -105,12 +111,26 @@ pub fn LoginScreen() -> Element {
         is_authenticating.set(true);
         login_error.set(None);
 
-        let _hs = homeserver.read().clone();
-        let _user = username.read().clone();
-        let _pass = password.read().clone();
+        let hs = homeserver.read().clone();
+        let user = username.read().clone();
+        let pass = password.read().clone();
 
         let task = spawn(async move {
-            // TODO: implement login_username logic
+            let handle = tokio::spawn(auth::login_username(hs, user, pass));
+
+            match handle.await {
+                Ok(Ok(c)) => {
+                    *CLIENT.write() = Some(c);
+                }
+                Ok(Err(e)) => {
+                    login_error.set(Some(e.to_string()));
+                }
+                Err(_) => {
+                    // *should* not happen
+                    login_error.set(Some("Authentication process aborted".into()));
+                }
+            }
+
             is_authenticating.set(false);
         });
 
@@ -224,7 +244,7 @@ pub fn LoginScreen() -> Element {
                             button {
                                 class: "w-full py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg text-white font-medium transition-colors cursor-pointer",
                                 disabled: is_authenticating(),
-                                onclick: submit_credentials,
+                                onclick: start_username_login,
                                 "Login"
                             }
                             div {

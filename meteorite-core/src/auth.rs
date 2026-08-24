@@ -266,13 +266,62 @@ pub async fn login() -> anyhow::Result<Option<Client>> {
     Ok(Some(client))
 }
 
+/// Tries to log a user in with the provided homeserver, username and password.
+///
+/// Also saves the new data (users.toml, encrypted file, keyring entry)
+/// On success, an authenticated Client is returned.
+pub async fn login_username(
+    homeserver: String,
+    username: String,
+    password: String,
+) -> anyhow::Result<Client> {
+    // first remove possible leftovers
+    remove_orphaned_accounts();
+
+    // get id and passphrase
+    let (id, encryption_passphrase) = generate_account_credentials();
+
+    // define paths
+    let account_path = utils::unwrap_lock(&ACCOUNT_PATH);
+
+    let sqlite_path = account_path.join(&id);
+
+    tokio::fs::create_dir_all(&account_path).await?;
+
+    // construct client
+    let client = Client::builder()
+        .server_name_or_homeserver_url(homeserver)
+        .sqlite_store(&sqlite_path, Some(&encryption_passphrase))
+        .build()
+        .await?;
+
+    // start login
+    let response = client
+        .matrix_auth()
+        .login_username(&username, &password)
+        .initial_device_display_name("meteorite Client")
+        .await?;
+
+    // construct new secure account data from response
+    let secure_data = SecureAccountData::new(
+        response.access_token,
+        response.refresh_token,
+        response.expires_in,
+        response.device_id,
+    );
+
+    tokio::task::spawn_blocking(move || {
+        save_account(&id, response.user_id, &secure_data, &encryption_passphrase)
+    })
+    .await??;
+
+    Ok(client)
+}
+
 /// Tries to log a user in via their homeserver.
 ///
 /// Also saves the new data (users.toml, encrypted file, keyring entry)
 /// On success, an authenticated Client is returned.
-///
-/// # Errors
-/// Can return any error if something fails in the process.
 pub async fn login_sso(
     homeserver: String,
     tx: mpsc::UnboundedSender<String>,
