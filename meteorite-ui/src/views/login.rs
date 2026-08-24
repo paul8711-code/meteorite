@@ -33,6 +33,8 @@ pub fn LoginScreen() -> Element {
     let mut is_authenticating = use_signal(|| false);
     let mut current_task = use_signal(|| Option::<dioxus_core::Task>::None);
 
+    let mut login_choices = use_signal(|| Option::<Vec<auth::LoginChoice>>::None);
+
     let window_height = match current_stage() {
         LoginStage::Homeserver => "h-[275px]",
         LoginStage::Credentials => "h-[465px]",
@@ -58,7 +60,8 @@ pub fn LoginScreen() -> Element {
 
             match handle.await {
                 Ok(Ok(choices)) => {
-                    todo!("handle login choices");
+                    // TODO: determine what buttons to show
+                    login_choices.set(Some(choices));
                 }
                 Ok(Err(e)) => {
                     error.set(Some(e.to_string()));
@@ -305,6 +308,7 @@ pub fn LoginScreen() -> Element {
                                 onclick: move |_| {
                                     error.set(None);
                                     show_validation_errors.set(false);
+                                    login_choices.set(None);
                                     current_stage.set(LoginStage::Homeserver);
                                 },
                                 "Back"
