@@ -143,7 +143,7 @@ pub fn LoginScreen() -> Element {
                 class: "relative, min-h-screen flex flex-col items-center justify-center p-4",
                 if let Some(err_msg) = login_error() {
                     div {
-                        class: "absolute top-12 z-50 w-full max-w-md p-4 rounded-lg bg-red-200 border-2 border-red-500 text-gray-900 text-center shadow-lg transition-all duration-300 animate-fade-in",
+                        class: "absolute top-12 z-50 w-full max-w-md p-4 rounded-lg bg-red-400 border-2 border-red-600 text-neutral-800 text-center shadow-lg transition-all duration-300 animate-fade-in",
                         "{err_msg}"
                     }
                 }
