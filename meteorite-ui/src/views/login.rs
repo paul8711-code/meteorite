@@ -28,7 +28,7 @@ pub fn LoginScreen() -> Element {
     let username = use_signal(String::new);
     let password = use_signal(String::new);
 
-    let mut login_error = use_signal(|| Option::<String>::None);
+    let mut error = use_signal(|| Option::<String>::None);
     let mut sso_link = use_signal(|| Option::<String>::None);
     let mut is_authenticating = use_signal(|| false);
     let mut current_task = use_signal(|| Option::<dioxus_core::Task>::None);
@@ -57,7 +57,7 @@ pub fn LoginScreen() -> Element {
 
         cancel_active_task();
 
-        login_error.set(None);
+        error.set(None);
         is_authenticating.set(true);
 
         let hs = homeserver.read().clone();
@@ -78,11 +78,11 @@ pub fn LoginScreen() -> Element {
                                 *CLIENT.write() = Some(c);
                             }
                             Ok(Err(e)) => {
-                                login_error.set(Some(e.to_string()));
+                                error.set(Some(e.to_string()));
                             }
                             Err(_) => {
                                 // *should* not happen
-                                login_error.set(Some("Authentication process aborted".into()));
+                                error.set(Some("Authentication process aborted".into()));
                             }
                         }
                         break;
@@ -109,7 +109,7 @@ pub fn LoginScreen() -> Element {
 
         show_validation_errors.set(false);
         is_authenticating.set(true);
-        login_error.set(None);
+        error.set(None);
 
         let hs = homeserver.read().clone();
         let user = username.read().clone();
@@ -123,11 +123,11 @@ pub fn LoginScreen() -> Element {
                     *CLIENT.write() = Some(c);
                 }
                 Ok(Err(e)) => {
-                    login_error.set(Some(e.to_string()));
+                    error.set(Some(e.to_string()));
                 }
                 Err(_) => {
                     // *should* not happen
-                    login_error.set(Some("Authentication process aborted".into()));
+                    error.set(Some("Authentication process aborted".into()));
                 }
             }
 
@@ -141,7 +141,7 @@ pub fn LoginScreen() -> Element {
         components::Bg {
             div {
                 class: "relative, min-h-screen flex flex-col items-center justify-center p-4",
-                if let Some(err_msg) = login_error() {
+                if let Some(err_msg) = error() {
                     div {
                         class: "absolute top-12 z-50 w-full max-w-md p-4 rounded-lg bg-red-400 border-2 border-red-600 text-neutral-800 text-center shadow-lg transition-all duration-300 animate-fade-in",
                         "{err_msg}"
@@ -268,6 +268,7 @@ pub fn LoginScreen() -> Element {
                                 class: "w-full py-2 bg-transparent hover:bg-neutral-700/50 rounded-lg text-neutral-400 text-sm transition-colors cursor-pointer",
                                 disabled: is_authenticating(),
                                 onclick: move |_| {
+                                    error.set(None);
                                     show_validation_errors.set(false);
                                     current_stage.set(LoginStage::Homeserver);
                                 },
