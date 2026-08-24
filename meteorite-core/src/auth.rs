@@ -177,9 +177,11 @@ pub enum LoginChoice {
 ///
 /// # Errors
 /// An error will be returned if connecting to the homeserver or any requests fail.
-pub async fn get_login_types(homeserver: &str) -> anyhow::Result<Vec<LoginChoice>> {
-    let homeserver_url = url::Url::parse(homeserver)?;
-    let client = Client::new(homeserver_url).await?;
+pub async fn get_login_types(homeserver: String) -> anyhow::Result<Vec<LoginChoice>> {
+    let client = Client::builder()
+        .server_name_or_homeserver_url(homeserver)
+        .build()
+        .await?;
 
     let mut types = Vec::new();
     let login_types = client.matrix_auth().get_login_types().await?.flows;
