@@ -44,6 +44,37 @@ pub fn LoginScreen() -> Element {
         }
     };
 
+    let mut check_homeserver = move || {
+        cancel_active_task();
+
+        error.set(None);
+
+        is_authenticating.set(true);
+
+        let hs = homeserver.read().clone();
+
+        let task = spawn(async move {
+            let handle = tokio::spawn(auth::get_login_types(hs));
+
+            match handle.await {
+                Ok(Ok(choices)) => {
+                    todo!("handle login choices");
+                }
+                Ok(Err(e)) => {
+                    error.set(Some(e.to_string()));
+                }
+                Err(_) => {
+                    // *should* not happen
+                    error.set(Some("Validation process aborted".into()));
+                }
+            }
+
+            is_authenticating.set(false);
+        });
+
+        current_task.set(Some(task));
+    };
+
     let cancel_login = move |_| {
         cancel_active_task();
         is_authenticating.set(false);
@@ -200,11 +231,15 @@ pub fn LoginScreen() -> Element {
                             button {
                                 class: "w-full py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-medium transition-colors cursor-pointer",
                                 onclick: move |_| {
+                                    error.set(None);
                                     if homeserver.read().is_empty() {
                                         show_validation_errors.set(true);
                                     } else {
                                         show_validation_errors.set(false);
-                                        current_stage.set(LoginStage::Credentials);
+                                        check_homeserver();
+                                        if error().is_none() && !is_authenticating() {
+                                            current_stage.set(LoginStage::Credentials);
+                                        }
                                     }
                                 },
                                 "Check"
