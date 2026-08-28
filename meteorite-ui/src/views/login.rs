@@ -313,29 +313,34 @@ pub fn LoginScreen() -> Element {
                                     }
                                 ),
 
-                                TextField {
-                                    label: "Username",
-                                    value: username,
-                                    disabled: is_busy(),
-                                    show_error: show_validation_errors() && username.read().is_empty(),
-                                }
-                                TextField {
-                                    label: "Password",
-                                    value: password,
-                                    is_password: true,
-                                    disabled: is_busy(),
-                                    show_error: show_validation_errors() && password.read().is_empty(),
-                                }
+                                if let Some(choices) = &*login_choices.read()
+                                    && choices.iter().any(|c| matches!(c, auth::LoginChoice::Password))
+                                    && choices.iter().all(|c| !matches!(c, auth::LoginChoice::Oauth { preferred: true }))
+                                {
+                                    TextField {
+                                        label: "Username",
+                                        value: username,
+                                        disabled: is_busy(),
+                                        show_error: show_validation_errors() && username.read().is_empty(),
+                                    }
+                                    TextField {
+                                        label: "Password",
+                                        value: password,
+                                        is_password: true,
+                                        disabled: is_busy(),
+                                        show_error: show_validation_errors() && password.read().is_empty(),
+                                    }
 
-                                hr {
-                                    class: "border-neutral-700 my-1",
-                                }
+                                    hr {
+                                        class: "border-neutral-700 my-1",
+                                    }
 
-                                button {
-                                    class: "w-full py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg text-white font-medium transition-colors cursor-pointer",
-                                    disabled: is_busy(),
-                                    onclick: start_username_login,
-                                    "Login"
+                                    button {
+                                        class: "w-full py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg text-white font-medium transition-colors cursor-pointer",
+                                        disabled: is_busy(),
+                                        onclick: start_username_login,
+                                        "Login"
+                                    }
                                 }
 
                                 if let Some(choices) = &*login_choices.read()
