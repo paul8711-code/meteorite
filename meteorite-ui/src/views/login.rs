@@ -339,7 +339,9 @@ pub fn LoginScreen() -> Element {
                                 }
 
                                 if let Some(choices) = &*login_choices.read()
-                                    && choices.iter().any(|c| matches!(c, auth::LoginChoice::Sso {identity_providers: _ })) {
+                                    && choices.iter().any(|c| matches!(c, auth::LoginChoice::Sso {identity_providers: _ }))
+                                    && choices.iter().all(|c| !matches!(c, auth::LoginChoice::Oauth { preferred: true }))
+                                {
                                     button {
                                         class: "w-full py-2 bg-neutral-700 hover:bg-neutral-600 rounded-lg text-white text-sm transition-colors cursor-pointer",
                                         onclick: start_sso_login,
