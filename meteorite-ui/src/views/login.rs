@@ -88,7 +88,7 @@ pub fn LoginScreen() -> Element {
 
         error.set(None);
 
-        is_authenticating.set(true);
+        is_busy.set(true);
 
         let hs = homeserver.read().clone();
 
@@ -109,27 +109,21 @@ pub fn LoginScreen() -> Element {
                 }
             }
 
-            is_authenticating.set(false);
+            is_busy.set(false);
         });
 
         current_task.set(Some(task));
     };
 
-    let cancel_login = move |_| {
-        cancel_active_task();
-        is_authenticating.set(false);
-        sso_link.set(None);
-    };
-
     let start_sso_login = move |_| {
-        if is_authenticating() {
+        if is_busy() {
             return;
         }
 
         cancel_active_task();
 
         error.set(None);
-        is_authenticating.set(true);
+        is_busy.set(true);
 
         let hs = homeserver.read().clone();
 
@@ -161,13 +155,13 @@ pub fn LoginScreen() -> Element {
                 }
             }
 
-            is_authenticating.set(false);
+            is_busy.set(false);
         });
         current_task.set(Some(task));
     };
 
     let start_username_login = move |_| {
-        if is_authenticating() {
+        if is_busy() {
             return;
         }
 
@@ -179,7 +173,7 @@ pub fn LoginScreen() -> Element {
         }
 
         show_validation_errors.set(false);
-        is_authenticating.set(true);
+        is_busy.set(true);
         error.set(None);
 
         let hs = homeserver.read().clone();
@@ -202,7 +196,7 @@ pub fn LoginScreen() -> Element {
                 }
             }
 
-            is_authenticating.set(false);
+            is_busy.set(false);
         });
 
         current_task.set(Some(task));
@@ -219,7 +213,7 @@ pub fn LoginScreen() -> Element {
                     }
                 }
 
-                if is_authenticating() {
+                if is_busy() {
                     div {
                         class: "absolute inset-0 z-40 bg-black/40 flex flex-col items-center justify-center gap-4 backdrop-blur-sm",
                         components::Spinner {
@@ -270,7 +264,7 @@ pub fn LoginScreen() -> Element {
                                 TextField {
                                     label: "Homeserver",
                                     value: homeserver,
-                                    disabled: is_authenticating(),
+                                    disabled: is_busy(),
                                     show_error: show_validation_errors() && homeserver.read().is_empty(),
                                 }
 
@@ -278,7 +272,7 @@ pub fn LoginScreen() -> Element {
                                     class: "border-neutral-700 my-2",
                                 }
 
-                                if !is_authenticating() {
+                                if !is_busy() {
                                     button {
                                         class: "w-full py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-medium transition-colors cursor-pointer",
                                         onclick: move |_| {
@@ -296,7 +290,9 @@ pub fn LoginScreen() -> Element {
                                     button {
                                         class: "z-60 w-full py-2 bg-red-600 hover:bg-red-500 rounded-lg text-white font-medium transition-colors cursor-pointer",
                                         onclick: move |_| {
-                                            cancel_login();
+                                            cancel_active_task();
+                                            is_busy.set(false);
+                                            sso_link.set(None);
                                         },
                                         "Cancel"
                                     }
@@ -320,14 +316,14 @@ pub fn LoginScreen() -> Element {
                                 TextField {
                                     label: "Username",
                                     value: username,
-                                    disabled: is_authenticating(),
+                                    disabled: is_busy(),
                                     show_error: show_validation_errors() && username.read().is_empty(),
                                 }
                                 TextField {
                                     label: "Password",
                                     value: password,
                                     is_password: true,
-                                    disabled: is_authenticating(),
+                                    disabled: is_busy(),
                                     show_error: show_validation_errors() && password.read().is_empty(),
                                 }
 
@@ -337,7 +333,7 @@ pub fn LoginScreen() -> Element {
 
                                 button {
                                     class: "w-full py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg text-white font-medium transition-colors cursor-pointer",
-                                    disabled: is_authenticating(),
+                                    disabled: is_busy(),
                                     onclick: start_username_login,
                                     "Login"
                                 }
@@ -348,10 +344,10 @@ pub fn LoginScreen() -> Element {
                                     "Login with Homeserver"
                                 }
 
-                                if !is_authenticating() {
+                                if !is_busy() {
                                     button {
                                         class: "w-full py-2 bg-transparent hover:bg-neutral-700/50 rounded-lg text-neutral-400 text-sm transition-colors cursor-pointer",
-                                        disabled: is_authenticating(),
+                                        disabled: is_busy(),
                                         onclick: move |_| {
                                             error.set(None);
                                             show_validation_errors.set(false);
@@ -364,7 +360,9 @@ pub fn LoginScreen() -> Element {
                                     button {
                                         class: "z-60 w-full py-2 bg-red-600 hover:bg-red-500 rounded-lg text-white text-sm transition-colors cursor-pointer",
                                         onclick: move |_| {
-                                            cancel_login();
+                                            cancel_active_task();
+                                            is_busy.set(false);
+                                            sso_link.set(None);
                                         },
                                         "Cancel"
                                     }
