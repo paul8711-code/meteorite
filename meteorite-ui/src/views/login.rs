@@ -22,6 +22,9 @@ use dioxus::prelude::*;
 #[component]
 pub fn LoginScreen() -> Element {
     let mut current_stage = use_signal(LoginStage::default);
+    let mut displayed_stage = use_signal(LoginStage::default);
+    let mut stage_visible = use_signal(|| true);
+
     let mut show_validation_errors = use_signal(|| false);
 
     let homeserver = use_signal(String::new);
@@ -30,15 +33,49 @@ pub fn LoginScreen() -> Element {
 
     let mut error = use_signal(|| Option::<String>::None);
     let mut sso_link = use_signal(|| Option::<String>::None);
-    let mut is_authenticating = use_signal(|| false);
+    let mut is_busy = use_signal(|| false);
     let mut current_task = use_signal(|| Option::<dioxus_core::Task>::None);
 
     let mut login_choices = use_signal(|| Option::<Vec<auth::LoginChoice>>::None);
 
-    let window_height = match current_stage() {
-        LoginStage::Homeserver => "h-[275px]",
-        LoginStage::Credentials => "h-[465px]",
-    };
+    use_effect(move || {
+        let _stage = displayed_stage();
+
+        spawn(async move {
+            tokio::task::yield_now().await;
+
+            document::eval(
+                r#"
+                const window = document.getElementById("login-window");
+                const content = document.getElementById("login-content");
+
+                if (window && content) {
+                    window.style.height = `${content.getBoundingClientRect().height}px`;
+                }
+            "#,
+            );
+        });
+    });
+
+    use_effect(move || {
+        let target = current_stage();
+
+        if target == displayed_stage() {
+            return;
+        }
+
+        spawn(async move {
+            stage_visible.set(false);
+
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+            displayed_stage.set(target);
+
+            tokio::task::yield_now().await;
+
+            stage_visible.set(true);
+        });
+    });
 
     let mut cancel_active_task = move || {
         if let Some(task) = current_task.take() {
@@ -198,120 +235,140 @@ pub fn LoginScreen() -> Element {
                 }
 
                 div {
-                    class: "w-full max-w-85 bg-neutral-800 border border-neutral-700 rounded-xl p-4 shadow-2xl transition-all duration-300 ease-in-out overflow-hidden {window_height}",
-                    div {
-                        class: "flex flex-col items-center mb-4",
-                        components::Icon {
-                            size: "h-16 w-16",
-                        }
-                    }
+                    id: "login-window",
+                    class: "w-full max-w-85 bg-neutral-800 border border-neutral-700 rounded-xl shadow-2xl transition-[height] duration-300 ease-in-out overflow-hidden",
 
                     div {
-                        class: "grid grid-cols-1 grid-rows-1",
+                        id: "login-content",
+                        class: "flex flex-col p-4",
 
                         div {
-                            class: format_args!(
-                                "flex flex-col gap-3 col-start-1 row-start-1 transition-all duration-200 ease-in-out {}",
-                                if current_stage() == LoginStage::Homeserver {
-                                    "opacity-100 delay-200 visible"
-                                } else {
-                                    "opacity-0 delay-0 invisible pointer-events-none"
-                                }
-                            ),
-
-                            TextField {
-                                label: "Homeserver",
-                                prefix: "https://",
-                                value: homeserver,
-                                disabled: is_authenticating(),
-                                show_error: show_validation_errors() && homeserver.read().is_empty(),
-                            }
-
-                            hr {
-                                class: "border-neutral-700 my-2",
-                            }
-
-                            button {
-                                class: "w-full py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-medium transition-colors cursor-pointer",
-                                onclick: move |_| {
-                                    error.set(None);
-                                    if homeserver.read().is_empty() {
-                                        show_validation_errors.set(true);
-                                    } else {
-                                        show_validation_errors.set(false);
-                                        check_homeserver();
-                                        if error().is_none() && !is_authenticating() {
-                                            current_stage.set(LoginStage::Credentials);
-                                        }
-                                    }
-                                },
-                                "Check"
+                            class: "flex flex-col items-center mb-4",
+                            components::Icon {
+                                size: "h-16 w-16",
                             }
                         }
 
                         div {
-                            class: format_args!(
-                                "flex flex-col gap-3 col-start-1 row-start-1 transition-all duration-200 ease-in-out {}",
-                                if current_stage() == LoginStage::Credentials {
-                                    "opacity-100 delay-200 visible"
-                                } else {
-                                    "opacity-0 delay-0 invisible pointer-events-none"
-                                }
-                            ),
+                            id: "login-stage",
+                            class: "relative",
 
-                            TextField {
-                                label: "Username",
-                                prefix: "",
-                                value: username,
-                                disabled: is_authenticating(),
-                                show_error: show_validation_errors() && username.read().is_empty(),
-                            }
-                            TextField {
-                                label: "Password",
-                                prefix: "",
-                                value: password,
-                                is_password: true,
-                                disabled: is_authenticating(),
-                                show_error: show_validation_errors() && password.read().is_empty(),
-                            }
-
-                            hr {
-                                class: "border-neutral-700 my-1",
-                            }
-
-                            button {
-                                class: "w-full py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg text-white font-medium transition-colors cursor-pointer",
-                                disabled: is_authenticating(),
-                                onclick: start_username_login,
-                                "Login"
-                            }
                             div {
-                                class: "text-center text-xs text-neutral-400 font-semibold",
-                                "or"
+                                class: format_args!(
+                                    "flex flex-col gap-3 transition-opacity duration-200 {}",
+                                    if displayed_stage() == LoginStage::Homeserver {
+                                        if stage_visible() {
+                                            "opacity-100 relative"
+                                        } else {
+                                            "opacity-0 relative"
+                                        }
+                                    } else {
+                                        "opacity-0 absolute inset-0 pointer-events-none"
+                                    }
+                                ),
+
+                                TextField {
+                                    label: "Homeserver",
+                                    value: homeserver,
+                                    disabled: is_authenticating(),
+                                    show_error: show_validation_errors() && homeserver.read().is_empty(),
+                                }
+
+                                hr {
+                                    class: "border-neutral-700 my-2",
+                                }
+
+                                if !is_authenticating() {
+                                    button {
+                                        class: "w-full py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-medium transition-colors cursor-pointer",
+                                        onclick: move |_| {
+                                            error.set(None);
+                                            if homeserver.read().is_empty() {
+                                                show_validation_errors.set(true);
+                                            } else {
+                                                show_validation_errors.set(false);
+                                                check_homeserver();
+                                            }
+                                        },
+                                        "Check"
+                                    }
+                                } else {
+                                    button {
+                                        class: "z-60 w-full py-2 bg-red-600 hover:bg-red-500 rounded-lg text-white font-medium transition-colors cursor-pointer",
+                                        onclick: move |_| {
+                                            cancel_login();
+                                        },
+                                        "Cancel"
+                                    }
+                                }
                             }
-                            if !is_authenticating() {
+
+                            div {
+                                class: format_args!(
+                                    "flex flex-col gap-3 transition-opacity duration-200 {}",
+                                    if displayed_stage() == LoginStage::Credentials {
+                                        if stage_visible() {
+                                            "opacity-100 relative"
+                                        } else {
+                                            "opacity-0 relative"
+                                        }
+                                    } else {
+                                        "opacity-0 absolute inset-0 pointer-events-none"
+                                    }
+                                ),
+
+                                TextField {
+                                    label: "Username",
+                                    value: username,
+                                    disabled: is_authenticating(),
+                                    show_error: show_validation_errors() && username.read().is_empty(),
+                                }
+                                TextField {
+                                    label: "Password",
+                                    value: password,
+                                    is_password: true,
+                                    disabled: is_authenticating(),
+                                    show_error: show_validation_errors() && password.read().is_empty(),
+                                }
+
+                                hr {
+                                    class: "border-neutral-700 my-1",
+                                }
+
+                                button {
+                                    class: "w-full py-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 rounded-lg text-white font-medium transition-colors cursor-pointer",
+                                    disabled: is_authenticating(),
+                                    onclick: start_username_login,
+                                    "Login"
+                                }
+
                                 button {
                                     class: "w-full py-2 bg-neutral-700 hover:bg-neutral-600 rounded-lg text-white text-sm transition-colors cursor-pointer",
                                     onclick: start_sso_login,
                                     "Login with Homeserver"
                                 }
-                            } else {
-                                button {
-                                    class: "z-60 w-full py-2 bg-red-600 hover:bg-red-500 rounded-lg text-white text-sm transition-colors cursor-pointer",
-                                    onclick: cancel_login,
-                                    "Cancel"
+
+                                if !is_authenticating() {
+                                    button {
+                                        class: "w-full py-2 bg-transparent hover:bg-neutral-700/50 rounded-lg text-neutral-400 text-sm transition-colors cursor-pointer",
+                                        disabled: is_authenticating(),
+                                        onclick: move |_| {
+                                            error.set(None);
+                                            show_validation_errors.set(false);
+                                            login_choices.set(None);
+                                            current_stage.set(LoginStage::Homeserver);
+                                        },
+                                        "Back"
+                                    }
+                                } else {
+                                    button {
+                                        class: "z-60 w-full py-2 bg-red-600 hover:bg-red-500 rounded-lg text-white text-sm transition-colors cursor-pointer",
+                                        onclick: move |_| {
+                                            cancel_login();
+                                        },
+                                        "Cancel"
+                                    }
                                 }
-                            }
-                            button {
-                                class: "w-full py-2 bg-transparent hover:bg-neutral-700/50 rounded-lg text-neutral-400 text-sm transition-colors cursor-pointer",
-                                disabled: is_authenticating(),
-                                onclick: move |_| {
-                                    error.set(None);
-                                    show_validation_errors.set(false);
-                                    login_choices.set(None);
-                                    current_stage.set(LoginStage::Homeserver);
-                                },
-                                "Back"
                             }
                         }
                     }
@@ -325,7 +382,6 @@ pub fn LoginScreen() -> Element {
 #[component]
 fn TextField(
     label: &'static str,
-    #[props(default = "")] prefix: &'static str,
     mut value: Signal<String>,
     #[props(default = false)] is_password: bool,
     #[props(default = false)] disabled: bool,
@@ -344,11 +400,6 @@ fn TextField(
 
             div {
                 class: "flex items-center w-full bg-neutral-900 border border-neutral-700 focus-within:border-blue-500 rounded-md transition-all disabled:opacity-50",
-
-                span {
-                    class: "pointer-events-none select-none pl-3 text-neutral-500 text-sm",
-                    "{prefix}"
-                }
 
                 input {
                     r#type: "{input_type}",
