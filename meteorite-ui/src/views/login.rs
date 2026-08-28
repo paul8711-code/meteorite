@@ -97,8 +97,8 @@ pub fn LoginScreen() -> Element {
 
             match handle.await {
                 Ok(Ok(choices)) => {
-                    // TODO: determine what buttons to show
                     login_choices.set(Some(choices));
+                    current_stage.set(LoginStage::Credentials);
                 }
                 Ok(Err(e)) => {
                     error.set(Some(e.to_string()));
@@ -338,10 +338,13 @@ pub fn LoginScreen() -> Element {
                                     "Login"
                                 }
 
-                                button {
-                                    class: "w-full py-2 bg-neutral-700 hover:bg-neutral-600 rounded-lg text-white text-sm transition-colors cursor-pointer",
-                                    onclick: start_sso_login,
-                                    "Login with Homeserver"
+                                if let Some(choices) = &*login_choices.read()
+                                    && choices.iter().any(|c| matches!(c, auth::LoginChoice::Sso {identity_providers: _ })) {
+                                    button {
+                                        class: "w-full py-2 bg-neutral-700 hover:bg-neutral-600 rounded-lg text-white text-sm transition-colors cursor-pointer",
+                                        onclick: start_sso_login,
+                                        "Login with Homeserver"
+                                    }
                                 }
 
                                 if !is_busy() {
