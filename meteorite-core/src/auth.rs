@@ -193,7 +193,9 @@ pub async fn get_login_types(homeserver: String) -> anyhow::Result<Vec<LoginChoi
         .any(|t| matches!(t, LoginType::Password(_)))
     {
         types.push(LoginChoice::Password);
-    } else if let Some(sso) = login_types.iter().find_map(|t| match t {
+    }
+
+    if let Some(sso) = login_types.iter().find_map(|t| match t {
         LoginType::Sso(sso) => Some(sso),
         _ => None,
     }) {

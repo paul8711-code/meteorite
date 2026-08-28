@@ -5,7 +5,6 @@
   - [x] SSO
   - [ ] OAuth
   - [x] Username
-  - [ ] hook get_login_types up in UI
 - [ ] Device verification (Emoji & QR)
 - [ ] Sending & receiving messages
 - [ ] Multi-Account
