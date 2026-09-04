@@ -1,6 +1,6 @@
 /*
     meteorite  Fast, Secure & Easy-to-use Matrix client in Rust
-    Copyright (C) 2026  Paul8711
+    Copyright (C) 2026  Vektrace
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as
@@ -56,7 +56,7 @@ pub fn FatalError(message: String) -> Element {
                             href: "#",
                             onclick: move |evt| {
                                 evt.prevent_default();
-                                let _ = webbrowser::open("https://github.com/paul8711-code/meteorite/issues");
+                                let _ = webbrowser::open("https://github.com/vektrace/meteorite/issues");
                             },
                             "open an issue on GitHub"
                         }

@@ -1,6 +1,6 @@
 /*
     meteorite  Fast, Secure & Easy-to-use Matrix client in Rust
-    Copyright (C) 2026  Paul8711
+    Copyright (C) 2026  Vektrace
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as
@@ -25,7 +25,7 @@ pub use matrix_sdk::Client;
 use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 
-pub const APP_NAME: &str = "com.paul8711.meteorite";
+pub const APP_NAME: &str = "com.vektrace.meteorite";
 static BASE_PATH: OnceLock<Mutex<PathBuf>> = OnceLock::new();
 static ACCOUNT_PATH: OnceLock<Mutex<PathBuf>> = OnceLock::new();
 

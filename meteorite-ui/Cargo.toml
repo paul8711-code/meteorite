@@ -2,10 +2,10 @@
 name = "meteorite"
 version = "0.1.0"
 edition = "2024"
-authors = ["Paul8711 <contact@paul8711.com>"]
+authors = ["Vektrace <contact@vektrace.com>"]
 description = "Fast, Secure & Easy-to-use Matrix client in Rust"
 license = "AGPL-3.0-only"
-repository = "https://github.com/paul8711-code/meteorite"
+repository = "https://github.com/vektrace/meteorite"
 
 [dependencies]
 meteorite-core = { path = "../meteorite-core" }

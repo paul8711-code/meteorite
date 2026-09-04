@@ -2,13 +2,13 @@
 name = "meteorite"
 
 [bundle]
-identifier = "com.paul8711.meteorite"
-publisher = "Paul8711"
+identifier = "com.vektrace.meteorite"
+publisher = "Vektrace"
 
 icon = ["assets/icon/icon-rounded.png"]
 
 [android]
-package = "com.paul8711.meteorite"
+package = "com.vektrace.meteorite"
 
 [iOS]
-bundle_id = "com.paul8711.meteorite"
+bundle_id = "com.vektrace.meteorite"
