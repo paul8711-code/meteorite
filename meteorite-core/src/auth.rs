@@ -186,7 +186,15 @@ pub async fn get_login_types(homeserver: String) -> anyhow::Result<Vec<LoginChoi
     let mut types = Vec::new();
     let login_types = client.matrix_auth().get_login_types().await?.flows;
 
-    let oauth_supported = client.oauth().server_metadata().await.is_ok();
+    let oauth_supported = if let Err(err) = client.oauth().server_metadata().await {
+        if err.is_not_supported() {
+            false
+        } else {
+            return Err(err.into());
+        }
+    } else {
+        true
+    };
 
     if login_types
         .iter()
