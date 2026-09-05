@@ -21,7 +21,7 @@ use age::secrecy::SecretString;
 use keyring_core::Entry;
 use matrix_sdk::{
     Client, SessionMeta, SessionTokens,
-    authentication::matrix::MatrixSession,
+    authentication::{matrix::MatrixSession, oauth::ClientId},
     ruma::{
         OwnedDeviceId, OwnedUserId,
         api::client::session::get_login_types::v3::{IdentityProvider, LoginType},
@@ -66,6 +66,8 @@ struct SecureAccountData {
     refresh_token: Option<String>,
     expiration: Option<SystemTime>,
     device_id: OwnedDeviceId,
+    // only present when logged in via oauth
+    client_id: Option<ClientId>,
 }
 
 impl SecureAccountData {
@@ -74,6 +76,7 @@ impl SecureAccountData {
         refresh_token: Option<String>,
         expires_in: Option<Duration>,
         device_id: OwnedDeviceId,
+        client_id: Option<ClientId>,
     ) -> Self {
         let expiration = if let Some(expires_in) = expires_in {
             // overflow impossible (for now)
@@ -87,6 +90,7 @@ impl SecureAccountData {
             refresh_token,
             expiration,
             device_id,
+            client_id,
         }
     }
 }
@@ -320,6 +324,7 @@ pub async fn login_username(
         response.refresh_token,
         response.expires_in,
         response.device_id,
+        None,
     );
 
     tokio::task::spawn_blocking(move || {
@@ -380,6 +385,7 @@ pub async fn login_sso(
         response.refresh_token,
         response.expires_in,
         response.device_id,
+        None,
     );
 
     tokio::task::spawn_blocking(move || {
