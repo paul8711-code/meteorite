@@ -44,6 +44,7 @@ static CLIENT: GlobalSignal<Option<Client>> = Signal::global(|| None::<Client>);
 
 #[tokio::main]
 async fn main() {
+    init::setup_device_name();
     init::setup_folders();
 
     // TODO: set icon

@@ -26,6 +26,8 @@ use std::path::PathBuf;
 use std::sync::{Mutex, OnceLock};
 
 pub const APP_NAME: &str = "com.vektrace.meteorite";
+
+static INITIAL_DEVICE_NAME: OnceLock<Mutex<String>> = OnceLock::new();
 static BASE_PATH: OnceLock<Mutex<PathBuf>> = OnceLock::new();
 static ACCOUNT_PATH: OnceLock<Mutex<PathBuf>> = OnceLock::new();
 

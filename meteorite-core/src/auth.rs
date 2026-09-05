@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::{ACCOUNT_PATH, APP_NAME, utils};
+use crate::{ACCOUNT_PATH, APP_NAME, INITIAL_DEVICE_NAME, utils};
 use age::secrecy::SecretString;
 use keyring_core::Entry;
 use matrix_sdk::{
@@ -315,7 +315,7 @@ pub async fn login_username(
     let response = client
         .matrix_auth()
         .login_username(&username, &password)
-        .initial_device_display_name("meteorite Client")
+        .initial_device_display_name(&utils::unwrap_lock(&INITIAL_DEVICE_NAME))
         .await?;
 
     // construct new secure account data from response
@@ -376,7 +376,7 @@ pub async fn login_sso(
             }
             Ok(())
         })
-        .initial_device_display_name("meteorite Client")
+        .initial_device_display_name(&utils::unwrap_lock(&INITIAL_DEVICE_NAME))
         .await?;
 
     // construct new secure account data from response

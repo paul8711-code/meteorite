@@ -16,11 +16,32 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-use crate::{ACCOUNT_PATH, APP_NAME, BASE_PATH};
+use crate::{ACCOUNT_PATH, APP_NAME, BASE_PATH, INITIAL_DEVICE_NAME};
 use std::fs;
 use std::sync::Mutex;
 
 // all functions in this file are used to inititalize something (e.g. set default keyring store)
+
+/// Sets the initial device display name based on which OS the user is on.
+pub fn setup_device_name() {
+    let name = if cfg!(target_os = "windows") {
+        "Windows"
+    } else if cfg!(target_os = "macos") {
+        "macOS"
+    } else if cfg!(target_os = "linux") {
+        "Linux"
+    } else if cfg!(target_os = "ios") {
+        "iOS"
+    } else if cfg!(target_os = "android") {
+        "Android"
+    } else {
+        "Unknown"
+    };
+
+    INITIAL_DEVICE_NAME
+        .set(Mutex::new(format!("meteorite Client ({})", name)))
+        .unwrap();
+}
 
 /// Sets the default keyring store.
 pub fn setup_keyring() -> Result<(), keyring_core::Error> {
