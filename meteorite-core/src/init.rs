@@ -24,7 +24,7 @@ use std::sync::Mutex;
 
 /// Sets the default keyring store.
 pub fn setup_keyring() -> Result<(), keyring_core::Error> {
-    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
+    #[cfg(target_os = "linux")]
     keyring_core::set_default_store(zbus_secret_service_keyring_store::Store::new()?);
     #[cfg(target_os = "windows")]
     keyring_core::set_default_store(windows_native_keyring_store::Store::new()?);
